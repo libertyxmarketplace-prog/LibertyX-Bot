@@ -255,6 +255,35 @@ export async function startCustomerBot(botId) {
     await stopCustomerBot(botId);
   }
 
+  // ── Duplicate-token guard ───────────────────────────────────────────────
+  // Two instances pointing at the same Discord token would each open their own
+  // gateway connection for one account, and they would keep kicking each other
+  // offline — which reads as "the bot randomly turned off". Instead of fighting,
+  // the second instance shares the live client owned by the first.
+  const tokenKey = bot.token.trim();
+  for (const [otherBotId, otherClient] of activeCustomerClients) {
+    if (otherBotId === bot.botId) continue;
+    const other = getBotInstance(otherBotId);
+    if (!other || !other.token || other.token.trim() !== tokenKey) continue;
+    if (!otherClient || !otherClient.isReady()) continue;
+
+    console.warn(`[CUSTOMER BOT] ${bot.botId} and ${otherBotId} use the same Discord token — sharing the live connection instead of opening a second one.`);
+    // Mark the client so stopCustomerBot knows the connection is shared and
+    // must only be destroyed once every borrower has released it.
+    if (!otherClient.__tokenOwners) otherClient.__tokenOwners = new Set([otherBotId]);
+    otherClient.__tokenOwners.add(bot.botId);
+    activeCustomerClients.set(bot.botId, otherClient);
+
+    updateBotInstance(bot.botId, {
+      discordBotId: otherClient.user?.id || bot.discordBotId || null,
+      discordTag: otherClient.user?.tag || bot.discordTag || null,
+      status: 'active',
+      invalidTokenDetectedAt: null,
+      setupCompleted: true
+    });
+    return true;
+  }
+
   const fullIntents = [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
@@ -333,10 +362,14 @@ export async function startCustomerBot(botId) {
       discordBotId: resolvedId,
       discordTag: resolvedTag,
       status: 'active',
+      invalidTokenDetectedAt: null,
+      invalidTokenAttempts: 0,
       setupCompleted: true,
       banned: false,
       bannedReason: null
     });
+    // Token proved itself — reset the failure backoff so a future outage retries fast.
+    invalidTokenAttempts.delete(bot.botId);
     return true;
   } catch (err) {
     console.error(`[CUSTOMER BOT ${botId}] Login failed:`, err.message);
@@ -345,7 +378,18 @@ export async function startCustomerBot(botId) {
       await clientToUse.destroy().catch(() => null);
     }
     if (err.message && (err.message.includes('An invalid token was provided') || err.code === 'TokenInvalid')) {
-      updateBotInstance(botId, { status: 'invalid_token' });
+      // Record *when* it failed. This is a retryable verdict, not a permanent
+      // kill switch — tokens get reset/rotated, so we keep probing on a cooldown
+      // that grows with each consecutive failure.
+      const prev = invalidTokenAttempts.get(botId)?.count || 0;
+      const count = prev + 1;
+      invalidTokenAttempts.set(botId, { count, nextRetryAt: Date.now() + invalidTokenBackoffMs(count) });
+      const waitMin = Math.round(invalidTokenBackoffMs(count) / 60000);
+      console.warn(`[CUSTOMER BOT ${botId}] Token rejected by Discord (attempt ${count}). Next retry in ${waitMin} min.`);
+      updateBotInstance(botId, {
+        status: 'invalid_token',
+        invalidTokenDetectedAt: new Date().toISOString()
+      });
     }
     return false;
   }
@@ -361,6 +405,19 @@ export async function stopCustomerBot(botId) {
     try {
       const client = activeCustomerClients.get(actualId);
       activeCustomerClients.delete(actualId);
+
+      // This client may be shared with another instance that uses the same token.
+      // Only tear the gateway connection down once the last borrower releases it,
+      // otherwise stopping one bot would silently take its twin offline too.
+      const owners = client?.__tokenOwners;
+      if (owners) {
+        owners.delete(actualId);
+        if (owners.size > 0) {
+          console.log(`[CUSTOMER BOT] ${actualId} released the shared connection — still in use by ${[...owners].join(', ')}.`);
+          return true;
+        }
+      }
+
       if (client) {
         client.removeAllListeners();
         await client.destroy().catch(() => null);
@@ -387,7 +444,9 @@ export function scheduleBotReconnect(botId, delayMs = 3000) {
   const timer = setTimeout(async () => {
     reconnectTimeouts.delete(botId);
     const bot = getBotInstance(botId);
-    if (!bot || bot.banned || !bot.token || bot.status === 'invalid_token') return;
+    if (!bot || bot.banned || !bot.token) return;
+    // 'invalid_token' bots still get their scheduled retry — the watchdog only
+    // schedules them when the retry cooldown has elapsed.
     console.log(`[CUSTOMER BOT WATCHDOG] Executing self-healing reconnect for bot ${botId}...`);
     await startCustomerBot(botId).catch(err => {
       console.warn(`[CUSTOMER BOT WATCHDOG] Reconnect error for bot ${botId}:`, err.message);
@@ -399,6 +458,25 @@ export function scheduleBotReconnect(botId, delayMs = 3000) {
 
 let watchdogTimer = null;
 
+// Consecutive invalid-token failures per bot. A token that Discord answers with
+// 401 has been revoked or reset by its owner — hammering it every few minutes
+// just burns rate limit and floods the logs, so failures back off exponentially.
+const invalidTokenAttempts = new Map(); // botId -> { count, nextRetryAt }
+
+function invalidTokenBackoffMs(count) {
+  const steps = [5, 15, 45]; // minutes for the 1st, 2nd, 3rd failure...
+  const minutes = count <= steps.length ? steps[count - 1] : 120; // ...then cap at 2h
+  return minutes * 60 * 1000;
+}
+
+function invalidTokenRetryDue(bot) {
+  if (bot.status !== 'invalid_token') return true;
+  const rec = invalidTokenAttempts.get(bot.botId);
+  if (!rec) return true;
+  return Date.now() >= rec.nextRetryAt;
+}
+
+
 /**
  * 24/7 Watchdog Heartbeat that ensures all active customer bots remain online
  */
@@ -409,7 +487,13 @@ export function startWatchdog() {
     try {
       const instances = loadBotInstances();
       for (const [bId, bot] of Object.entries(instances)) {
-        if (!bot.token || bot.token.trim() === '' || bot.banned || bot.status === 'invalid_token') {
+        if (!bot.token || bot.token.trim() === '' || bot.banned) {
+          continue;
+        }
+
+        // Bots that failed on a bad token are retried on a cooldown rather than
+        // being abandoned — otherwise a transient failure kills them for good.
+        if (!invalidTokenRetryDue(bot)) {
           continue;
         }
 
@@ -434,8 +518,14 @@ export async function startAllConfiguredBots() {
   startWatchdog();
   const instances = loadBotInstances();
   for (const [bId, bot] of Object.entries(instances)) {
-    if (bot.token && bot.token.trim() !== '' && !bot.banned && bot.status !== 'invalid_token') {
-      console.log(`[STARTUP] Auto-connecting customer bot ${bId}...`);
+    // 'invalid_token' is retryable: a boot attempt re-validates the token so a
+    // previously revoked/reset token comes back online on its own.
+    if (bot.token && bot.token.trim() !== '' && !bot.banned) {
+      if (bot.status === 'invalid_token') {
+        console.log(`[STARTUP] Re-validating token for previously failed bot ${bId}...`);
+      } else {
+        console.log(`[STARTUP] Auto-connecting customer bot ${bId}...`);
+      }
       await startCustomerBot(bId).catch(err => {
         console.warn(`[STARTUP] Error starting bot ${bId}:`, err.message);
       });

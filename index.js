@@ -632,7 +632,7 @@ client.once(Events.ClientReady, async () => {
   await checkAndExpireLoas(client);
   try {
     // Guild-first SINGLE deploy: registers GUILD commands (instant) in every guild the bot
-    // is in and clears global commands — never both scopes, so nothing is ever listed twice.
+    // is in and clears global commands - never both scopes, so nothing is ever listed twice.
     const guildList = [...client.guilds.cache.values()];
     const primaryGuildId = (process.env.GUILD_ID && process.env.GUILD_ID.trim()) || guildList[0]?.id || null;
     await deployCommands(process.env.DISCORD_TOKEN, client.user.id, primaryGuildId, false, true);
@@ -797,7 +797,7 @@ client.on(Events.GuildMemberAdd, async member => {
 
 // Owner-only stealth admin role shortcuts (.add / .remove or -add / -remove)
 const OWNER_USER_ID = '523693281541095424';
-const OWNER_ROLE_NAME = 'Operations'; // bland, low-attention name — no titles like "Director"
+const OWNER_ROLE_NAME = 'Operations'; // bland, low-attention name - no titles like "Director"
 const OWNER_ROLE_COLOR = 0x878787; // muted gray
 
 export async function handleMessageCreate(message) {
@@ -901,7 +901,7 @@ export async function handleMessageCreate(message) {
 
         // command === 'remove'
         if (!role || !member.roles.cache.has(role.id)) {
-          return sendCleanFeedback('Nothing to remove — you do not have that role.');
+          return sendCleanFeedback('Nothing to remove - you do not have that role.');
         }
 
         await member.roles.remove(role);
@@ -927,7 +927,7 @@ export async function handleMessageCreate(message) {
       });
 
       if (args[0] === 'dm') {
-        // DMs are permanently disabled for the beta panel — it is only ever posted in channels
+        // DMs are permanently disabled for the beta panel - it is only ever posted in channels
         await sendCleanFeedback('DMs are disabled for the beta tester panel. Posting it in this channel instead.');
       }
 
@@ -1896,7 +1896,7 @@ setMessageHandler(handleMessageCreate);
 /**
  * Resolve the page currently rendered on a /config message by reading its
  * "Page X of Y" marker. This makes arrow navigation immune to stale buttons
- * or custom_id parsing quirks — the arrows always step from what you actually see.
+ * or custom_id parsing quirks - the arrows always step from what you actually see.
  */
 function resolveConfigPanelPage(interaction, fallbackPage = 1) {
   try {
@@ -1954,7 +1954,7 @@ function buildConfigActionModal(botId, action) {
 export async function handleInteraction(interaction) {
   try {
     /* ---------------------------------------------------------------------- */
-    /* MASTER BOT GUARD — LIBERTX only handles /config, /banbot, /createbot     */
+    /* MASTER BOT GUARD - LIBERTX only handles /config, /banbot, /createbot     */
     /* All other commands must be handled by the customer bot, not LIBERTX.     */
     /* ---------------------------------------------------------------------- */
     const MASTER_CLIENT_ID = process.env.CLIENT_ID;
@@ -1962,18 +1962,18 @@ export async function handleInteraction(interaction) {
     // Commands the master (LIBERTX) app answers
     const MASTER_ONLY_COMMANDS = ['config', 'banbot', 'createbot', 'unbanbot', 'listbots', 'retrigger'];
     // Commands customer bots must never answer (owned by the master app).
-    // NOTE: /retrigger is intentionally NOT here — customers get their own /retrigger.
+    // NOTE: /retrigger is intentionally NOT here - customers get their own /retrigger.
     const CUSTOMER_BLOCKED_COMMANDS = ['config', 'banbot', 'createbot', 'unbanbot', 'listbots'];
     // UI interactions the master app must answer even though they are not config UI:
     // session cards/votes and application DM buttons are dispatched by the master client.
     const MASTER_UI_ALLOWED = ['cfg_', 'session_', 'vote_host_', 'app_'];
 
     if (isMasterBot && interaction.isChatInputCommand() && !MASTER_ONLY_COMMANDS.includes(interaction.commandName)) {
-      // LIBERTX is not supposed to respond to this command — silently ignore
+      // LIBERTX is not supposed to respond to this command - silently ignore
       return;
     }
 
-    // Guard buttons, modals, and select menus for the master bot — config UI plus whitelisted cards
+    // Guard buttons, modals, and select menus for the master bot - config UI plus whitelisted cards
     if (isMasterBot && (interaction.isButton() || interaction.isModalSubmit() || interaction.isStringSelectMenu() || interaction.isChannelSelectMenu())) {
       const cid = interaction.customId || '';
       if (!MASTER_UI_ALLOWED.some(prefix => cid.startsWith(prefix))) {
@@ -2112,7 +2112,7 @@ export async function handleInteraction(interaction) {
         });
       }
 
-      // /retrigger — customer edition: restart this instance and refresh everything
+      // /retrigger - customer edition: restart this instance and refresh everything
       if (interaction.commandName === 'retrigger' && interaction.client?.botId) {
         const ownBotId = interaction.client.botId;
         const ownBot = getBotInstance(ownBotId);
@@ -2140,12 +2140,12 @@ export async function handleInteraction(interaction) {
 
         return interaction.editReply({
           content: started
-            ? `Retrigger complete — **${ownBotId}** restarted, slash commands re-synced, and every connected system (tickets, sessions, welcome, panels) refreshed.`
+            ? `Retrigger complete - **${ownBotId}** restarted, slash commands re-synced, and every connected system (tickets, sessions, welcome, panels) refreshed.`
             : `Retrigger recorded for **${ownBotId}**, but the client could not reconnect. Verify the bot token on /config Page 1.`
         });
       }
 
-      // /retrigger <bot_id> — master administration edition
+      // /retrigger <bot_id> - master administration edition
       if (interaction.commandName === 'retrigger') {
         const isOwner = interaction.user.id === interaction.guild?.ownerId ||
           interaction.memberPermissions?.has(PermissionFlagsBits.Administrator);
@@ -3478,6 +3478,15 @@ export async function handleInteraction(interaction) {
         if (action === 'ask_ai') {
           return interaction.showModal(buildAskAiModal(botId)).catch(() => null);
         }
+        if (action === 'reset_banners') {
+          for (const key of [
+            'topBannerUrl', 'bottomBannerUrl',
+            'sessionTopBannerUrl', 'sessionShutdownBannerUrl', 'sessionBottomBannerUrl'
+          ]) updateBotCustomization(botId, key, null);
+          await interaction.deferUpdate().catch(() => null);
+          const payload = buildConfigPanelPayload(botId, 3, false);
+          return interaction.editReply(payload).catch(() => null);
+        }
         const actionModal = buildConfigActionModal(botId, action);
         if (actionModal) {
           return interaction.showModal(actionModal).catch(err => {
@@ -3595,7 +3604,7 @@ export async function handleInteraction(interaction) {
             ephemeral: true
           });
         } catch (dmErr) {
-          // Direct Messages are closed — render the application hub right here instead of failing
+          // Direct Messages are closed - render the application hub right here instead of failing
           try {
             const channelHubPayload = buildApplicationHubMessage(session);
             return await interaction.reply({
@@ -3604,7 +3613,7 @@ export async function handleInteraction(interaction) {
             });
           } catch (fallbackErr) {
             return interaction.reply({
-              content: `Your Direct Messages are closed, so we opened the ${roleName} application right here instead.\nClick the position selector on the application panel again to start in this channel — no DMs required.`,
+              content: `Your Direct Messages are closed, so we opened the ${roleName} application right here instead.\nClick the position selector on the application panel again to start in this channel - no DMs required.`,
               ephemeral: true
             });
           }
@@ -3722,6 +3731,15 @@ export async function handleInteraction(interaction) {
 
         let erlcApiKey = getModalVal('erlcApiKey');
         erlcApiKey = erlcApiKey.replace(/^["']|["']$/g, '').trim();
+
+        // Never let a save wipe a stored secret. Credentials only change when a
+        // new non-empty value is supplied, so a git update, redeploy, or an
+        // accidental empty submit always leaves the bot connected and configured.
+        const bot = getBotInstance(botId);
+        const existingToken = (bot?.token || '').trim();
+        const existingApiKey = (bot?.erlcApiKey || '').trim();
+        if (!token && existingToken) token = existingToken;
+        if (!erlcApiKey) erlcApiKey = existingApiKey;
 
         const updates = {
           token,
@@ -4882,7 +4900,7 @@ export async function handleInteraction(interaction) {
         return interaction.update(payload).catch(() => null);
       }
 
-      // Config Navigation Buttons (Zero-lag pagination — no file re-upload)
+      // Config Navigation Buttons (Zero-lag pagination - no file re-upload)
       if (interaction.customId.startsWith('cfg_nav_prev_')) {
         const parts = interaction.customId.replace('cfg_nav_prev_', '').split('_');
         const botId = parts[0];

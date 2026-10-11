@@ -23,7 +23,7 @@ export const EMOJIS = {
 export const DEFAULT_BOTTOM_BANNER = null;
 
 /**
- * Module registry — drives the header, the intro blockquote, and the tab strip.
+ * Module registry - drives the header, the intro blockquote, and the tab strip.
  * Tab labels are intentionally short so four of them fit cleanly in one action row.
  */
 export const PAGE_META = [
@@ -44,7 +44,7 @@ function maskSecret(str) {
   return `${str.slice(0, 4)}...${str.slice(-4)}`;
 }
 
-// Clean plain-text status — no emojis, no backticks, no clutter
+// Clean plain-text status - no emojis, no backticks, no clutter
 function statusText(isConfigured, yesLabel = 'Configured', noLabel = 'Not set') {
   return isConfigured ? yesLabel : noLabel;
 }
@@ -99,11 +99,11 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
   });
 
   let cardPillSeq = 0;
-  const card = (text, accessory = null, pillLabel = 'Info') => {
+  const card = (text, accessory = null, pillLabel = 'Read only') => {
     // Sub-lines render as blockquotes ("> ") for a cleaner reference-style read
     const content = text.replace(/^-# /gm, '> ');
     const section = { type: 9, components: [{ type: 10, content }] };
-    // Discord requires an accessory on every Section — use a disabled pill when none is given
+    // Discord requires an accessory on every Section - use a disabled pill when none is given
     section.accessory = accessory || {
       type: 2,
       style: 2,
@@ -115,11 +115,6 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
   };
 
   // ── Page directory ─────────────────────────────────────────────────────
-  const PAGE_TABS = [
-    'Credentials', 'Categories', 'Appearance', 'Sessions',
-    'Applications', 'Docs', 'Staff', 'Assistant'
-  ];
-
   // Intro copy rendered as a blockquote under every page title
   const PAGE_INTROS = {
     1: 'Your bot control room. Credentials, secrets and live link state live here, and are never exposed to server members.',
@@ -131,7 +126,7 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
     7: 'Access control, greeting cards, promotions and infraction logging for your staff team.',
     8: 'Connect an AI provider, then describe the change you want in plain English and let the assistant apply it for you.'
   };
-  // Per-page index dropdown — mirrors the reference "index" row at the top
+  // Per-page index dropdown - mirrors the reference "index" row at the top
   const PAGE_INDEX = {
     1: [
       { label: 'Bot Token & API Key', desc: 'Discord token and ER:LC key', action: 'edit_credentials' },
@@ -146,7 +141,8 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
     3: [
       { label: 'Panel Text', desc: 'Panel title and inside greeting', action: 'edit_ticket_text' },
       { label: 'Rules & Greeting', desc: 'Rules button, name and content', action: 'edit_rules_greeting' },
-      { label: 'Banners', desc: 'Header, inside and accent art', action: 'edit_ticket_banners' }
+      { label: 'Banners', desc: 'Header, inside and accent art', action: 'edit_ticket_banners' },
+      { label: 'Reset Banners', desc: 'Clear every banner back to default', action: 'reset_banners' }
     ],
     4: [
       { label: 'Channels & Roles', desc: 'Announcements, radios, host', action: 'edit_session_channels' },
@@ -177,42 +173,26 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
 
   // Closing notice rendered above the navigation deck on every page
   const PAGE_NOTES = {
-    1: 'Never share your bot token — anyone holding it has full control of the account.',
+    1: 'Never share your bot token - anyone holding it has full control of the account.',
     2: 'Slot names are what members read, so keep them short and unmistakable.',
     3: 'The rules gate is enforced on the ticket panel and inside every new ticket.',
     4: 'Sessions only broadcast once a host has been granted the host role.',
     5: 'Closed positions hide themselves from the public application hub automatically.',
-    6: 'Documentation is visible to staff only — keep sensitive material out of it.',
+    6: 'Documentation is visible to staff only - keep sensitive material out of it.',
     7: 'Falling back to server administrators is always safe if a role is left unset.',
     8: 'The assistant only ever writes to this bot instance, never anything global.'
   };
-  const tabButton = (pageNum, label) => ({
-    type: 2,
-    style: pageNum === activePage ? 1 : 2,
-    label,
-    custom_id: `cfg_tab_${botId}_${pageNum}`
-  });
-
   const header = (title) => {
     containerComponents.push({
       type: 10,
       content: [
         `# ${title}`,
-        `-# Page ${activePage} of ${TOTAL_PAGES} \u2022 Node ${botId}`,
+        `-# Page ${activePage} of ${TOTAL_PAGES} \u2022 ${botId}`,
         '',
         `> ${PAGE_INTROS[activePage] || ''}`
       ].join('\n')
     });
 
-    // Tab bar: two rows of four, current section highlighted blue
-    containerComponents.push({
-      type: 1,
-      components: PAGE_TABS.slice(0, 4).map((t, i) => tabButton(i + 1, t))
-    });
-    containerComponents.push({
-      type: 1,
-      components: PAGE_TABS.slice(4, 8).map((t, i) => tabButton(i + 5, t))
-    });
 
     // Index dropdown listing everything this page can edit
     const indexEntries = PAGE_INDEX[activePage] || [];
@@ -275,8 +255,7 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
           `**Bot Token** • ${statusText(hasToken)}`,
           `**ER:LC API Key** • ${statusText(hasApiKey)}`,
           `**State** • ${botStatus}`
-        ].join('\n'),
-        act('edit_credentials', 'Edit Credentials', 1)
+        ].join('\n'),
       ));
 
       containerComponents.push(card(
@@ -285,8 +264,7 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
           `-# Community identity used across every panel`,
           `**Community Name** • ${cust.serverName?.trim() || 'Not set'}`,
           `**Join Code** • ${cust.joinCode?.trim() || 'Not set'}`
-        ].join('\n'),
-        act('edit_servercore', 'Server Details')
+        ].join('\n'),
       ));
 
       containerComponents.push(card(
@@ -340,8 +318,7 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
           `**Category Directory**`,
           `-# Named slots rendered on the ticket panel`,
           categories.map((c, i) => slot(c, i)).join('\n')
-        ].join('\n'),
-        act('edit_ticket_catnames', 'Slot Names', 1)
+        ].join('\n'),
       ));
 
       containerComponents.push(card(
@@ -351,8 +328,7 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
           categories.map((c, i) =>
             `${slot(c, i)} → ${c.spawnCategoryId ? `<#${c.spawnCategoryId}>` : 'not set'}`
           ).join('\n')
-        ].join('\n'),
-        act('edit_ticket_catspawns', 'Spawn Channels')
+        ].join('\n'),
       ));
 
       containerComponents.push(card(
@@ -362,8 +338,7 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
           categories.map((c, i) =>
             `${slot(c, i)} → ${c.pingRoleId ? `<@&${c.pingRoleId}>` : 'no ping'}`
           ).join('\n')
-        ].join('\n'),
-        act('edit_ticket_catpings', 'Alert Roles')
+        ].join('\n'),
       ));
 
       containerComponents.push(card(
@@ -372,21 +347,20 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
           `-# Transcript destination and claim permissions`,
           `**Transcripts** • ${chanRef(cust.transcriptsChannelId)}`,
           `**Claim Role** • ${roleRef(cust.ticketClaimRoleId)}`
-        ].join('\n'),
-        act('edit_ticket_banners', 'Claim & Transcripts')
+        ].join('\n'),
       ));
       break;
     }
 
     // ══════════════════════════════════════════════════════════════════════
-    // PAGE 3: TICKET APPEARANCE — PANEL / RULES & GREETING / GRAPHICS
+    // PAGE 3: TICKET APPEARANCE - PANEL / RULES & GREETING / GRAPHICS
     // ══════════════════════════════════════════════════════════════════════
     case 3: {
       const insideBanner = cust.ticketInsideBannerUrl ? 'Custom' : 'Default';
       const topBanner = cust.topBannerUrl ? 'Custom' : 'Default';
       const bottomBanner = cust.bottomBannerUrl ? 'Custom' : 'Default';
       const openGreeting = cust.ticketOpenMessage
-        ? `"${cust.ticketOpenMessage.slice(0, 60)}${cust.ticketOpenMessage.length > 60 ? '…' : ''}"`
+        ? `"${cust.ticketOpenMessage.slice(0, 60)}${cust.ticketOpenMessage.length > 60 ? '...' : ''}"`
         : 'Built-in support welcome';
       const showRules = cust.showRulesButton !== false;
 
@@ -399,8 +373,7 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
           `**Title** • ${cust.panelTitle || 'Support'}`,
           `**Header Banner** • ${topBanner}`,
           `**Inside Banner** • ${insideBanner}`
-        ].join('\n'),
-        act('edit_ticket_text', 'Panel Text', 1)
+        ].join('\n'),
       ));
 
       containerComponents.push(card(
@@ -411,8 +384,7 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
           `**Button Name** • "${cust.rulesButtonLabel || 'Rules'}"`,
           `**Rules Content** • ${cust.rulesDescription ? 'Custom' : 'Default'}`,
           `**Inside Greeting** • ${openGreeting}`
-        ].join('\n'),
-        act('edit_rules_greeting', 'Rules & Greeting')
+        ].join('\n'),
       ));
 
       containerComponents.push(card(
@@ -422,21 +394,9 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
           `**Header Banner** • ${topBanner}`,
           `**Inside Banner** • ${insideBanner}`,
           `**Bottom Accent** • ${bottomBanner}`
-        ].join('\n'),
-        act('edit_ticket_banners', 'Banners')
+        ].join('\n'),
       ));
 
-      containerComponents.push({
-        type: 1,
-        components: [
-          {
-            type: 2,
-            style: 2,
-            label: 'Reset All Banners',
-            custom_id: `cfg_btn_resetbanners_${botId}`
-          }
-        ]
-      });
       break;
     }
     // ══════════════════════════════════════════════════════════════════════
@@ -458,8 +418,7 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
           `**Queue Staging** • ${chanRef(cust.queueVcId)}`,
           `**Session Host** • ${roleRef(cust.hostRoleId)}`,
           `**Staff Alerts** • ${roleRef(cust.notificationRoleId)}`
-        ].join('\n'),
-        act('edit_session_channels', 'Channels & Roles', 1)
+        ].join('\n'),
       ));
 
       containerComponents.push(card(
@@ -469,8 +428,7 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
           `**Live Stage** • ${liveBanner}`,
           `**Vote Stage** • ${voteBanner}`,
           `**Concluded Stage** • ${shutBanner}`
-        ].join('\n'),
-        act('edit_session_banners', 'Session Banners')
+        ].join('\n'),
       ));
 
       containerComponents.push(card(
@@ -479,8 +437,7 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
           `-# Headlines posted when sessions open and close`,
           `**Startup Headline** • ${cust.sessionStartTitle || 'Default'}`,
           `**Concluded Headline** • ${cust.sessionShutdownTitle || 'Default'}`
-        ].join('\n'),
-        act('edit_session_text', 'Announcement Text')
+        ].join('\n'),
       ));
       break;
     }
@@ -502,8 +459,7 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
           `-# Where submissions land and get published`,
           `**Review Feed** • ${chanRef(cust.reviewChannelId)}`,
           `**Results Channel** • ${chanRef(cust.resultsChannelId)}`
-        ].join('\n'),
-        act('edit_app_channels', 'Application Channels', 1)
+        ].join('\n'),
       ));
 
       containerComponents.push(card(
@@ -520,8 +476,7 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
           `**In-Game Interview Bank**`,
           `-# Questions asked during in-game interviews`,
           `**Questions Loaded** • ${ingameQCount}`
-        ].join('\n'),
-        act('edit_app_questions_ingame', 'Edit Bank')
+        ].join('\n'),
       ));
 
       containerComponents.push(card(
@@ -529,8 +484,7 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
           `**Discord Interview Bank**`,
           `-# Questions asked during Discord interviews`,
           `**Questions Loaded** • ${discordQCount}`
-        ].join('\n'),
-        act('edit_app_questions_discord', 'Edit Bank')
+        ].join('\n'),
       ));
       break;
     }
@@ -551,8 +505,7 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
           `**Destination** • ${chanRef(cust.staffDocsChannelId)}`,
           `**Layout** • ${layoutMode}`,
           `**Title** • ${cust.staffDocsTitle || 'Official Staff Documentation'}`
-        ].join('\n'),
-        act('edit_staffdocs_content', 'Text & Layout', 1)
+        ].join('\n'),
       ));
 
       containerComponents.push(card(
@@ -561,8 +514,7 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
           `-# Artwork framing the documentation hub`,
           `**Top Banner** • ${topBannerStatus}`,
           `**Bottom Banner** • ${bottomBannerStatus}`
-        ].join('\n'),
-        act('edit_staffdocs_banners', 'Banners')
+        ].join('\n'),
       ));
 
       containerComponents.push(card(
@@ -570,8 +522,7 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
           `**Destination**`,
           `-# Where the hub gets published`,
           `**Channel** • ${chanRef(cust.staffDocsChannelId)}`
-        ].join('\n'),
-        act('edit_staffdocs_channel', 'Channel')
+        ].join('\n'),
       ));
       break;
     }
@@ -588,8 +539,7 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
           `-# Who can manage this instance`,
           `**Staff Role** • ${roleRef(cust.botStaffRoleId)}`,
           `**Fallback** • Server administrators`
-        ].join('\n'),
-        act('edit_staffrole', 'Staff Role', 1)
+        ].join('\n'),
       ));
 
       containerComponents.push(card(
@@ -599,8 +549,7 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
           `**Channel** • ${chanRef(cust.welcomeChannelId)}`,
           `**Status** • ${cust.welcomeEnabled && cust.welcomeChannelId ? 'Enabled' : 'Disabled'}`,
           `**Banner** • ${cust.welcomeBannerUrl ? 'Custom' : 'Default'}`
-        ].join('\n'),
-        act('edit_welcome', 'Welcome Setup')
+        ].join('\n'),
       ));
 
       containerComponents.push(card(
@@ -610,8 +559,7 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
           `**Channel** • ${chanRef(cust.promotionsChannelId)}`,
           `**Ping Role** • ${roleRef(cust.promotionStaffRoleId)}`,
           `**Banner** • ${cust.promoteBannerUrl ? 'Custom' : 'Default'}`
-        ].join('\n'),
-        act('edit_promotions', 'Promotions')
+        ].join('\n'),
       ));
 
       containerComponents.push(card(
@@ -621,8 +569,7 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
           `**Channel** • ${chanRef(cust.infractionsChannelId)}`,
           `**Ping Role** • ${roleRef(cust.infractionStaffRoleId)}`,
           `**Banner** • ${cust.infractBannerUrl ? 'Custom' : 'Default'}`
-        ].join('\n'),
-        act('edit_infractions', 'Infractions')
+        ].join('\n'),
       ));
       break;
     }
@@ -643,8 +590,7 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
           `**Provider** • ${activeAiProv}`,
           `**API Key** • ${statusText(hasAiKey, 'Connected', 'Not set')}`,
           `**Model** • ${activeModel}`
-        ].join('\n'),
-        act('edit_ai_key', 'API Key & Provider', 1)
+        ].join('\n'),
       ));
 
       containerComponents.push(card(
@@ -659,8 +605,7 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
 
       containerComponents.push({
         type: 1,
-        components: [
-          act('ask_ai', 'Ask AI Assistant', 3)
+        components: [
         ]
       });
       break;

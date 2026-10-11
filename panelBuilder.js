@@ -103,7 +103,7 @@ export function buildTicketPanel(deskData = null, customConfig = null) {
     });
   }
 
-  // Category select menu — the same categories, available as a dropdown
+  // Category select menu  - the same categories, available as a dropdown
   const selectOptions = configuredCats.slice(0, 5).map((cat, idx) => {
     const catId = cat.id || `cat_${idx + 1}`;
     const cleanLabel = (cat.name || `Support ${idx + 1}`).trim();

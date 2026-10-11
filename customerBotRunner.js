@@ -258,7 +258,7 @@ export async function startCustomerBot(botId) {
   // ── Duplicate-token guard ───────────────────────────────────────────────
   // Two instances pointing at the same Discord token would each open their own
   // gateway connection for one account, and they would keep kicking each other
-  // offline — which reads as "the bot randomly turned off". Instead of fighting,
+  // offline  - which reads as "the bot randomly turned off". Instead of fighting,
   // the second instance shares the live client owned by the first.
   const tokenKey = bot.token.trim();
   for (const [otherBotId, otherClient] of activeCustomerClients) {
@@ -267,7 +267,7 @@ export async function startCustomerBot(botId) {
     if (!other || !other.token || other.token.trim() !== tokenKey) continue;
     if (!otherClient || !otherClient.isReady()) continue;
 
-    console.warn(`[CUSTOMER BOT] ${bot.botId} and ${otherBotId} use the same Discord token — sharing the live connection instead of opening a second one.`);
+    console.warn(`[CUSTOMER BOT] ${bot.botId} and ${otherBotId} use the same Discord token  - sharing the live connection instead of opening a second one.`);
     // Mark the client so stopCustomerBot knows the connection is shared and
     // must only be destroyed once every borrower has released it.
     if (!otherClient.__tokenOwners) otherClient.__tokenOwners = new Set([otherBotId]);
@@ -368,7 +368,7 @@ export async function startCustomerBot(botId) {
       banned: false,
       bannedReason: null
     });
-    // Token proved itself — reset the failure backoff so a future outage retries fast.
+    // Token proved itself  - reset the failure backoff so a future outage retries fast.
     invalidTokenAttempts.delete(bot.botId);
     return true;
   } catch (err) {
@@ -379,7 +379,7 @@ export async function startCustomerBot(botId) {
     }
     if (err.message && (err.message.includes('An invalid token was provided') || err.code === 'TokenInvalid')) {
       // Record *when* it failed. This is a retryable verdict, not a permanent
-      // kill switch — tokens get reset/rotated, so we keep probing on a cooldown
+      // kill switch  - tokens get reset/rotated, so we keep probing on a cooldown
       // that grows with each consecutive failure.
       const prev = invalidTokenAttempts.get(botId)?.count || 0;
       const count = prev + 1;
@@ -413,7 +413,7 @@ export async function stopCustomerBot(botId) {
       if (owners) {
         owners.delete(actualId);
         if (owners.size > 0) {
-          console.log(`[CUSTOMER BOT] ${actualId} released the shared connection — still in use by ${[...owners].join(', ')}.`);
+          console.log(`[CUSTOMER BOT] ${actualId} released the shared connection  - still in use by ${[...owners].join(', ')}.`);
           return true;
         }
       }
@@ -445,7 +445,7 @@ export function scheduleBotReconnect(botId, delayMs = 3000) {
     reconnectTimeouts.delete(botId);
     const bot = getBotInstance(botId);
     if (!bot || bot.banned || !bot.token) return;
-    // 'invalid_token' bots still get their scheduled retry — the watchdog only
+    // 'invalid_token' bots still get their scheduled retry  - the watchdog only
     // schedules them when the retry cooldown has elapsed.
     console.log(`[CUSTOMER BOT WATCHDOG] Executing self-healing reconnect for bot ${botId}...`);
     await startCustomerBot(botId).catch(err => {
@@ -459,7 +459,7 @@ export function scheduleBotReconnect(botId, delayMs = 3000) {
 let watchdogTimer = null;
 
 // Consecutive invalid-token failures per bot. A token that Discord answers with
-// 401 has been revoked or reset by its owner — hammering it every few minutes
+// 401 has been revoked or reset by its owner  - hammering it every few minutes
 // just burns rate limit and floods the logs, so failures back off exponentially.
 const invalidTokenAttempts = new Map(); // botId -> { count, nextRetryAt }
 
@@ -492,7 +492,7 @@ export function startWatchdog() {
         }
 
         // Bots that failed on a bad token are retried on a cooldown rather than
-        // being abandoned — otherwise a transient failure kills them for good.
+        // being abandoned  - otherwise a transient failure kills them for good.
         if (!invalidTokenRetryDue(bot)) {
           continue;
         }

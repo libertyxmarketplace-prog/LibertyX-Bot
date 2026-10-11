@@ -264,7 +264,7 @@ export async function processAiConfigRequest({ botId, prompt, userId }) {
   if (!apiKey) {
     return {
       success: false,
-      message: "No AI API Key configured! Please open `/config` and enter your AI API key on Page 5."
+      message: "No AI API Key configured! Please open `/config` and enter your AI API key on Page 8."
     };
   }
 

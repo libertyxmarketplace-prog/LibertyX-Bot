@@ -196,7 +196,7 @@ function createCustomerClient(bot, intents) {
       try {
         const cid = interaction.customId || '';
         if (cid.startsWith('cfg_')) return;
-        const MASTER_CMDS = ['config', 'banbot', 'createbot', 'unbanbot', 'listbots', 'retrigger'];
+        const MASTER_CMDS = ['config', 'banbot', 'createbot', 'unbanbot', 'listbots'];
         if (interaction.isChatInputCommand() && MASTER_CMDS.includes(interaction.commandName)) return;
 
         const currentBot = getBotInstance(botId);

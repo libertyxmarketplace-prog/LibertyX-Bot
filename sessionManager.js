@@ -504,6 +504,10 @@ export function saveSessionVote(vote) {
  */
 export function buildSessionVotePayload(vote, customConfig = null) {
   const currentVotes = Array.isArray(vote.voters) ? vote.voters.length : 0;
+  // Effective status honours the voting window even if the sweeper has not run yet
+  const voteStatus = (vote.status === 'active' && vote.expiresAt && Date.now() >= vote.expiresAt)
+    ? 'expired'
+    : vote.status;
   const isGoalReached = currentVotes >= vote.requiredVotes;
   const cust = customConfig || vote?.customizations || {};
   const serverName = cust.serverName || vote?.serverName || 'Server';
@@ -623,9 +627,9 @@ export function buildSessionVotePayload(vote, customConfig = null) {
       {
         type: 2,
         style: 2,
-        label: 'Vote',
+        label: voteStatus === 'active' ? 'Vote' : (vote.status === 'completed' ? 'Goal Reached' : 'Voting Closed'),
         custom_id: `session_vote_cast_${vote.id}`,
-        disabled: vote.status !== 'active'
+        disabled: voteStatus !== 'active'
       },
       {
         type: 2,
@@ -651,10 +655,20 @@ export function buildSessionVotePayload(vote, customConfig = null) {
     });
   }
 
-  // 9. Dynamic relative timestamp footer
+  // 9. Dynamic relative timestamp footer (status aware)
+  let footerText = `-# Started: <t:${Math.floor(vote.createdAt / 1000)}:R> • Expires: <t:${Math.floor(vote.expiresAt / 1000)}:R>`;
+  if (voteStatus === 'expired') {
+    footerText = `-# Voting window closed • Expired <t:${Math.floor(vote.expiresAt / 1000)}:R>`;
+  } else if (vote.status === 'completed') {
+    footerText = `-# Goal reached <t:${Math.floor(vote.createdAt / 1000)}:R> • Awaiting host confirmation`;
+  } else if (vote.status === 'started') {
+    footerText = `-# Session started by host • Launched <t:${Math.floor(vote.createdAt / 1000)}:R>`;
+  } else if (vote.status === 'postponed') {
+    footerText = `-# Session postponed • Vote opened <t:${Math.floor(vote.createdAt / 1000)}:R>`;
+  }
   containerComponents.push({
     type: 10,
-    content: `-# Started: <t:${Math.floor(vote.createdAt / 1000)}:R> • Expires: <t:${Math.floor(vote.expiresAt / 1000)}:R>`
+    content: footerText
   });
 
   return {

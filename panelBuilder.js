@@ -103,6 +103,33 @@ export function buildTicketPanel(deskData = null, customConfig = null) {
     });
   }
 
+  // Category select menu — the same categories, available as a dropdown
+  const selectOptions = configuredCats.slice(0, 5).map((cat, idx) => {
+    const catId = cat.id || `cat_${idx + 1}`;
+    const cleanLabel = (cat.name || `Support ${idx + 1}`).trim();
+    const isClosed = disabledList.includes(catId) || disabledList.includes(cleanLabel.toLowerCase());
+    return {
+      label: cleanLabel.slice(0, 100),
+      description: (isClosed ? 'Currently closed by staff' : `Open a ${cleanLabel} ticket`).slice(0, 100),
+      value: `ticket_cat_${catId}`,
+      ...(isClosed ? { disabled: true } : {})
+    };
+  });
+
+  if (selectOptions.length > 0) {
+    containerComponents.push({
+      type: 1,
+      components: [
+        {
+          type: 3,
+          custom_id: 'ticket_category_select',
+          placeholder: customConfig?.panelSelectPlaceholder?.trim() || 'Select a category to open a ticket...',
+          options: selectOptions
+        }
+      ]
+    });
+  }
+
   // 5. Bottom banner (only if explicitly configured by user)
   if (bottomBanner && bottomBanner.trim() !== '') {
     containerComponents.push({

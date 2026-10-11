@@ -515,7 +515,11 @@ const commands = [
             .setDescription('Reason for your leave of absence')
             .setRequired(true)
         )
-    )
+    ),
+  new SlashCommandBuilder()
+    .setName('retrigger')
+    .setDescription('Restart your bot instance and refresh every connected system')
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
 ].map(cmd => cmd.toJSON());
 
 export const adminOnlyCommands = [

@@ -22,6 +22,21 @@ export const EMOJIS = {
 
 export const DEFAULT_BOTTOM_BANNER = null;
 
+/**
+ * Module registry — drives the header, the intro blockquote, and the tab strip.
+ * Tab labels are intentionally short so four of them fit cleanly in one action row.
+ */
+export const PAGE_META = [
+  { id: 1, tab: 'Core', title: 'CREDENTIALS & SETUP', intro: 'Link your bot, lock in your community identity, and confirm this instance is live.' },
+  { id: 2, tab: 'Tickets', title: 'TICKET CATEGORIES', intro: 'Name the slots members see, route where each ticket is created, and choose who gets alerted.' },
+  { id: 3, tab: 'Appearance', title: 'TICKET APPEARANCE', intro: 'Control the panel headline, the rules gate members must pass, and every banner on show.' },
+  { id: 4, tab: 'Sessions', title: 'LIVE SESSIONS', intro: 'Wire broadcast channels and operating roles, then set the artwork and copy for each stage.' },
+  { id: 5, tab: 'Applications', title: 'STAFF APPLICATIONS', intro: 'Point intake at the right channels and maintain the interview banks for each discipline.' },
+  { id: 6, tab: 'Docs', title: 'STAFF DOCUMENTATION', intro: 'Publish the central staff reference hub, pick its layout, and frame it with artwork.' },
+  { id: 7, tab: 'Staff', title: 'STAFF & COMMUNITY', intro: 'Grant control of this instance, greet new members, and route promotions and infractions.' },
+  { id: 8, tab: 'AI', title: 'AI ASSISTANT', intro: 'Connect a provider and let the assistant rewrite panels, roles, and banners for you.' }
+];
+
 
 function maskSecret(str) {
   if (!str || typeof str !== 'string' || str.trim() === '') return 'Not Set';
@@ -85,7 +100,9 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
 
   let cardPillSeq = 0;
   const card = (text, accessory = null, pillLabel = 'Info') => {
-    const section = { type: 9, components: [{ type: 10, content: text }] };
+    // Sub-lines render as blockquotes ("> ") for a cleaner reference-style read
+    const content = text.replace(/^-# /gm, '> ');
+    const section = { type: 9, components: [{ type: 10, content }] };
     // Discord requires an accessory on every Section — use a disabled pill when none is given
     section.accessory = accessory || {
       type: 2,
@@ -97,11 +114,124 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
     return section;
   };
 
+  // ── Page directory ─────────────────────────────────────────────────────
+  const PAGE_TABS = [
+    'Credentials', 'Categories', 'Appearance', 'Sessions',
+    'Applications', 'Docs', 'Staff', 'Assistant'
+  ];
+
+  // Intro copy rendered as a blockquote under every page title
+  const PAGE_INTROS = {
+    1: 'Your bot control room. Credentials, secrets and live link state live here, and are never exposed to server members.',
+    2: 'The support lanes members pick from, and exactly where each one opens its ticket. Name a slot, point it at a channel, then choose who gets pinged.',
+    3: 'How the ticket panel reads to members: headline copy, the rules gate they pass before opening a ticket, and the artwork framing it all.',
+    4: 'Everything that powers an ER:LC live session: broadcast channels, operating roles, banner artwork and announcement copy.',
+    5: 'Staff intake. Decide where submissions land, who publishes results, and edit the interview banks used during review.',
+    6: 'The documentation hub your team opens whenever they need a reference at hand, including layout and artwork.',
+    7: 'Access control, greeting cards, promotions and infraction logging for your staff team.',
+    8: 'Connect an AI provider, then describe the change you want in plain English and let the assistant apply it for you.'
+  };
+  // Per-page index dropdown — mirrors the reference "index" row at the top
+  const PAGE_INDEX = {
+    1: [
+      { label: 'Bot Token & API Key', desc: 'Discord token and ER:LC key', action: 'edit_credentials' },
+      { label: 'Server Details', desc: 'Community name and join code', action: 'edit_servercore' }
+    ],
+    2: [
+      { label: 'Category Names', desc: 'Name the five ticket slots', action: 'edit_ticket_catnames' },
+      { label: 'Spawn Channels', desc: 'Where each slot opens a ticket', action: 'edit_ticket_catspawns' },
+      { label: 'Alert Roles', desc: 'Who gets pinged on open', action: 'edit_ticket_catpings' },
+      { label: 'Claim & Transcripts', desc: 'Archive target and claim role', action: 'edit_ticket_banners' }
+    ],
+    3: [
+      { label: 'Panel Text', desc: 'Panel title and inside greeting', action: 'edit_ticket_text' },
+      { label: 'Rules & Greeting', desc: 'Rules button, name and content', action: 'edit_rules_greeting' },
+      { label: 'Banners', desc: 'Header, inside and accent art', action: 'edit_ticket_banners' }
+    ],
+    4: [
+      { label: 'Channels & Roles', desc: 'Announcements, radios, host', action: 'edit_session_channels' },
+      { label: 'Session Banners', desc: 'Live, vote and concluded art', action: 'edit_session_banners' },
+      { label: 'Announcement Text', desc: 'Startup and closing copy', action: 'edit_session_text' }
+    ],
+    5: [
+      { label: 'Application Channels', desc: 'Review and results feeds', action: 'edit_app_channels' },
+      { label: 'In-Game Interview Bank', desc: 'Questions asked in game', action: 'edit_app_questions_ingame' },
+      { label: 'Discord Interview Bank', desc: 'Questions asked on Discord', action: 'edit_app_questions_discord' }
+    ],
+    6: [
+      { label: 'Text & Layout', desc: 'Hub title and display mode', action: 'edit_staffdocs_content' },
+      { label: 'Banners', desc: 'Top and bottom artwork', action: 'edit_staffdocs_banners' },
+      { label: 'Destination', desc: 'Where the hub is posted', action: 'edit_staffdocs_channel' }
+    ],
+    7: [
+      { label: 'Staff Role', desc: 'Who can manage this instance', action: 'edit_staffrole' },
+      { label: 'Welcome Setup', desc: 'Greeting card and banner', action: 'edit_welcome' },
+      { label: 'Promotions', desc: 'Rank-up announcements', action: 'edit_promotions' },
+      { label: 'Infractions', desc: 'Disciplinary records', action: 'edit_infractions' }
+    ],
+    8: [
+      { label: 'API Key & Provider', desc: 'Connect an AI provider', action: 'edit_ai_key' },
+      { label: 'Ask AI Assistant', desc: 'Describe a change in English', action: 'ask_ai' }
+    ]
+  };
+
+  // Closing notice rendered above the navigation deck on every page
+  const PAGE_NOTES = {
+    1: 'Never share your bot token — anyone holding it has full control of the account.',
+    2: 'Slot names are what members read, so keep them short and unmistakable.',
+    3: 'The rules gate is enforced on the ticket panel and inside every new ticket.',
+    4: 'Sessions only broadcast once a host has been granted the host role.',
+    5: 'Closed positions hide themselves from the public application hub automatically.',
+    6: 'Documentation is visible to staff only — keep sensitive material out of it.',
+    7: 'Falling back to server administrators is always safe if a role is left unset.',
+    8: 'The assistant only ever writes to this bot instance, never anything global.'
+  };
+  const tabButton = (pageNum, label) => ({
+    type: 2,
+    style: pageNum === activePage ? 1 : 2,
+    label,
+    custom_id: `cfg_tab_${botId}_${pageNum}`
+  });
+
   const header = (title) => {
     containerComponents.push({
       type: 10,
-      content: `# ${title}\n-# Page ${activePage} of ${TOTAL_PAGES} • Node ${botId}`
+      content: [
+        `# ${title}`,
+        `-# Page ${activePage} of ${TOTAL_PAGES} \u2022 Node ${botId}`,
+        '',
+        `> ${PAGE_INTROS[activePage] || ''}`
+      ].join('\n')
     });
+
+    // Tab bar: two rows of four, current section highlighted blue
+    containerComponents.push({
+      type: 1,
+      components: PAGE_TABS.slice(0, 4).map((t, i) => tabButton(i + 1, t))
+    });
+    containerComponents.push({
+      type: 1,
+      components: PAGE_TABS.slice(4, 8).map((t, i) => tabButton(i + 5, t))
+    });
+
+    // Index dropdown listing everything this page can edit
+    const indexEntries = PAGE_INDEX[activePage] || [];
+    if (indexEntries.length > 0) {
+      containerComponents.push({
+        type: 1,
+        components: [{
+          type: 3,
+          custom_id: `cfg_index_${botId}_${activePage}`,
+          placeholder: 'Select a setting to open\u2026',
+          options: indexEntries.map(e => ({
+            label: e.label,
+            description: e.desc,
+            value: e.action
+          }))
+        }]
+      });
+    }
+
     containerComponents.push({ type: 14, divider: true, spacing: 1 });
   };
 
@@ -537,9 +667,17 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
     }
   }
 
-  // ── Navigation deck (two arrows kept, position pill, refresh, helper) ──
+  // ── Closing notice strip ───────────────────────────────────────────────────
   containerComponents.push({ type: 14, divider: true, spacing: 1 });
+  if (PAGE_NOTES[activePage]) {
+    containerComponents.push({
+      type: 10,
+      content: `> ${PAGE_NOTES[activePage]}`
+    });
+  }
 
+  // ── Navigation deck (two arrows kept, position pill, refresh, helper) ──
+  containerComponents.push({ type: 14, divider: true, spacing: 2 });
   containerComponents.push({
     type: 1,
     components: [

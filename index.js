@@ -3458,6 +3458,36 @@ export async function handleInteraction(interaction) {
       }
 
       // /config category navigation select menu
+      // /config section tab bar (highlighted-blue pills above the cards)
+      if (interaction.customId.startsWith('cfg_tab_')) {
+        await interaction.deferUpdate().catch(() => null);
+        const rest = interaction.customId.replace('cfg_tab_', '');
+        const m = rest.match(/^(.*)_(\d{1,2})$/);
+        if (!m) return;
+        const botId = m[1];
+        const targetPage = Math.max(1, Math.min(TOTAL_PAGES, parseInt(m[2], 10) || 1));
+        const payload = buildConfigPanelPayload(botId, targetPage, false);
+        return interaction.editReply(payload).catch(() => null);
+      }
+
+      // /config per-page index dropdown (opens the matching modal directly)
+      if (interaction.customId.startsWith('cfg_index_')) {
+        const botId = interaction.customId.replace('cfg_index_', '').replace(/_(\d+)$/, '');
+        const action = interaction.values?.[0];
+        if (!action) return;
+        if (action === 'ask_ai') {
+          return interaction.showModal(buildAskAiModal(botId)).catch(() => null);
+        }
+        const actionModal = buildConfigActionModal(botId, action);
+        if (actionModal) {
+          return interaction.showModal(actionModal).catch(err => {
+            if (err.code !== 40060 && err.code !== 10062) {
+              console.warn(`[CONFIG INDEX] showModal error (${action}):`, err.message);
+            }
+          });
+        }
+      }
+
       if (interaction.customId.startsWith('cfg_select_page_')) {
         await interaction.deferUpdate().catch(() => null);
         const botId = interaction.customId.replace('cfg_select_page_', '');

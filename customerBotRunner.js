@@ -49,9 +49,18 @@ export function setMessageHandler(handler) {
 
 function createCustomerClient(bot, intents) {
   const botId = bot.botId;
+  const defaultPromo = bot.customizations?.serverName
+    ? `${bot.customizations.serverName} | Code: ${bot.customizations.joinCode || 'Join'}`
+    : 'Orlando Roleplay | Join Now';
+  const actName = (bot.customizations?.botActivityText && bot.customizations.botActivityText.trim()) || defaultPromo;
+
   const customerClient = new Client({
     intents,
-    partials: [Partials.Channel, Partials.Message, Partials.GuildMember, Partials.User]
+    partials: [Partials.Channel, Partials.Message, Partials.GuildMember, Partials.User],
+    presence: {
+      status: 'online',
+      activities: [{ name: actName, type: ActivityType.Watching }]
+    }
   });
   customerClient.botId = botId;
 
@@ -331,7 +340,8 @@ export async function startCustomerBot(botId) {
         });
       });
 
-      await client.login(bot.token.trim());
+      const cleanToken = bot.token.replace(/^["']|["']$/g, '').replace(/^Bot\s+/i, '').trim();
+      await client.login(cleanToken);
       await readyPromise;
       return client;
     } catch (err) {

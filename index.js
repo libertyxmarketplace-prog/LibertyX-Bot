@@ -587,22 +587,42 @@ async function closeTicketWorkflow(channel, closedByUser, reasonOverride = null)
       const authorUser = await discordClient.users.fetch(ticketData.authorId).catch(() => null);
       if (authorUser) {
         const dmEmbed = new EmbedBuilder()
-          .setColor(0x0a84fd)
-          .setTitle(`Support Ticket Closed | #${channel.name}`)
+          .setColor(0x2b2d31)
+          .setTitle(`Support Ticket Concluded | #${channel.name}`)
           .setDescription(
-            `> Your support ticket **#${channel.name}** in **${channel.guild?.name || 'the server'}** has concluded.\n\n` +
-            `• **Closed By:** <@${closedByUser.id}> (\`${closedByUser.tag || closedByUser.id}\`)\n` +
-            `• **Resolution Reason:** ${closeReason}\n` +
-            `• **Duration:** ${durationStr}\n\n` +
-            `*A complete transcript file has been archived and attached below for your records.*`
+            `> Your inquiry in **${channel.guild?.name || 'the server'}** has been successfully resolved.\n\n` +
+            `**Resolution Summary**\n` +
+            `<:checkmark:1552901024400932894> **Ticket Channel:** \`#${channel.name}\`\n` +
+            `<:people:1552549954109706250> **Handled By:** <@${closedByUser.id}> (\`${closedByUser.tag || closedByUser.id}\`)\n` +
+            `<:briefcase:1552550290425909258> **Resolution:** \`${closeReason}\`\n` +
+            `<:chart:1552551135737413663> **Duration:** \`${durationStr}\`\n\n` +
+            `Your complete conversation transcript has been securely archived below.`
           )
-          .setFooter({ text: `${channel.guild?.name || 'Mavely'} Support` })
+          .setFooter({ text: `${channel.guild?.name || 'Mavely'} Support • Archived Record` })
           .setTimestamp();
 
         const dmPayload = { embeds: [dmEmbed] };
+        const dmComponents = [];
+
+        if (transcriptUrl) {
+          dmComponents.push(
+            new ActionRowBuilder().addComponents(
+              new ButtonBuilder()
+                .setStyle(ButtonStyle.Link)
+                .setURL(transcriptUrl)
+                .setLabel('Download Transcript (.html)')
+            )
+          );
+        }
+
+        if (dmComponents.length > 0) {
+          dmPayload.components = dmComponents;
+        }
+
         if (transcriptAttachment) {
           dmPayload.files = [transcriptAttachment];
         }
+
         await authorUser.send(dmPayload).catch(dmErr => {
           console.warn(`[closeTicketWorkflow] User ${ticketData.authorId} has DMs disabled:`, dmErr.message);
         });
@@ -1968,8 +1988,17 @@ function buildConfigActionModal(botId, action) {
   }
 }
 
+const processedInteractionIds = new Set();
+
 export async function handleInteraction(interaction) {
   try {
+    // 0. Interaction Deduplication Guard: guarantee every interaction is processed only once
+    if (interaction.id) {
+      if (processedInteractionIds.has(interaction.id)) return;
+      processedInteractionIds.add(interaction.id);
+      setTimeout(() => processedInteractionIds.delete(interaction.id), 15000);
+    }
+
     /* ---------------------------------------------------------------------- */
     /* MASTER BOT GUARD - LIBERTX only handles /config, /banbot, /createbot     */
     /* All other commands must be handled by the customer bot, not LIBERTX.     */
@@ -1980,7 +2009,7 @@ export async function handleInteraction(interaction) {
     const MASTER_ONLY_COMMANDS = ['config', 'banbot', 'createbot', 'unbanbot', 'listbots', 'retrigger'];
     // Commands customer bots must never answer (owned by the master app).
     // NOTE: /retrigger is intentionally NOT here - customers get their own /retrigger.
-    const CUSTOMER_BLOCKED_COMMANDS = ['config', 'banbot', 'createbot', 'unbanbot', 'listbots'];
+    const CUSTOMER_BLOCKED_COMMANDS = ['banbot', 'createbot', 'unbanbot', 'listbots'];
     // UI interactions the master app must answer even though they are not config UI:
     // session cards/votes and application DM buttons are dispatched by the master client.
     const MASTER_UI_ALLOWED = ['cfg_', 'session_', 'vote_host_', 'app_'];
@@ -1998,18 +2027,11 @@ export async function handleInteraction(interaction) {
       }
     }
 
-    // Guard customer bots from handling master bot commands and config UI
+    // Guard customer bots from handling administrative master bot commands
     if (!isMasterBot) {
       if (interaction.isChatInputCommand() && CUSTOMER_BLOCKED_COMMANDS.includes(interaction.commandName)) {
         return interaction.reply({
           content: `${EMOJIS.CROSS} \`/${interaction.commandName}\` is managed by the main **Mavely** bot. Please run it with Mavely.`,
-          flags: 64
-        }).catch(() => null);
-      }
-      const cid = interaction.customId || '';
-      if (cid.startsWith('cfg_')) {
-        return interaction.reply({
-          content: `${EMOJIS.CROSS} Configuration interactions are handled by the main **Mavely** bot.`,
           flags: 64
         }).catch(() => null);
       }
@@ -3508,6 +3530,20 @@ export async function handleInteraction(interaction) {
       }
 
       // /config Native Select Menu Handlers (Instant save, no manual ID typing)
+      if (interaction.customId.startsWith('cfg_chan_ticketspawn_')) {
+        const botId = interaction.customId.replace('cfg_chan_ticketspawn_', '');
+        const val = interaction.values?.[0] || '';
+        updateBotCustomization(botId, 'ticketSpawnCategoryId', val);
+        const botInst = getBotInstance(botId);
+        if (botInst) {
+          const cats = botInst.customizations?.ticketCategories || [];
+          cats.forEach(c => { c.spawnCategoryId = val; });
+          updateBotCustomization(botId, 'ticketCategories', cats);
+        }
+        const payload = buildConfigPanelPayload(botId, 2, false);
+        return interaction.update(payload).catch(() => null);
+      }
+
       if (interaction.customId.startsWith('cfg_chan_transcripts_')) {
         const botId = interaction.customId.replace('cfg_chan_transcripts_', '');
         const val = interaction.values?.[0] || '';

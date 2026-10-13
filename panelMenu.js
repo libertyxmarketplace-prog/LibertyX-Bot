@@ -163,18 +163,7 @@ export function buildPanelMenuPayload({
     ]
   });
 
-  // Bottom Accent Strip (Uploaded Banner)
-  const bottomBanner = getPanelBottomBanner(customizations?.bottomBannerUrl);
-  if (bottomBanner.mediaUrl) {
-    containerComponents.push({
-      type: 12,
-      items: [{ media: { url: bottomBanner.mediaUrl } }]
-    });
 
-    if (includeAttachment && bottomBanner.attachment) {
-      files.push(bottomBanner.attachment);
-    }
-  }
 
   const payload = {
     flags: 32768,

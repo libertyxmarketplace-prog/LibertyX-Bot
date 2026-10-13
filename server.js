@@ -479,8 +479,15 @@ if (webDistPath) {
   });
 }
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`[LIBERTX WEB API] Dashboard backend listening on http://localhost:${PORT}`);
+});
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.warn(`[LIBERTX WEB API] Port ${PORT} is already in use by another instance. Web dashboard active on previous instance.`);
+  } else {
+    console.error('[LIBERTX WEB API] Server error:', err);
+  }
 });
 
 export default app;

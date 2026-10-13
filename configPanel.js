@@ -19,6 +19,7 @@ import { getBotInstance } from './botManager.js';
 import { AI_CAPABILITIES } from './aiConfigAssistant.js';
 import { getPanelBottomBanner } from './panelMenu.js';
 import { activeCustomerClients } from './customerBotRunner.js';
+import { CONFIG } from './config.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -156,10 +157,6 @@ export function buildNavButtonRow(botId, activePage) {
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(activePage >= TOTAL_PAGES),
     new ButtonBuilder()
-      .setCustomId(`cfg_nav_refresh_${botId}_${activePage}`)
-      .setLabel('Refresh')
-      .setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder()
       .setCustomId(`cfg_nav_helper_${botId}`)
       .setLabel('Helper')
       .setStyle(ButtonStyle.Success)
@@ -195,26 +192,29 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
     files.push(new AttachmentBuilder(MAVELY_LOGO_PATH, { name: 'mavely_logo.png' }));
   }
 
+  const bigBanner = cust.topBannerUrl || CONFIG.SESSION.VOTE_TOP_BANNER_URL || 'https://i.imgur.com/8QzX9nB.png';
+
   const embed = new EmbedBuilder()
     .setColor(0x2b2d31)
-    .setAuthor({ name: 'Mavely', iconURL: 'attachment://mavely_logo.png' })
-    .setThumbnail('attachment://mavely_logo.png')
-    .setFooter({ text: `Mavely • Page ${activePage} of ${TOTAL_PAGES}` });
+    .setImage(bigBanner)
+    .setFooter({ text: `Page ${activePage} of ${TOTAL_PAGES}` });
 
   switch (activePage) {
     // ══════════════════════════════════════════════════════════════════════
     // PAGE 1: PERMISSIONS & ACCESS
     // ══════════════════════════════════════════════════════════════════════
     case 1: {
+      const staffMark = cust.botStaffRoleId ? EMOJIS.CHECK : EMOJIS.CROSS;
       const staffDisplay = cust.botStaffRoleId ? `<@&${cust.botStaffRoleId}>` : 'Not Configured';
       const adminRole = cust.adminRoleId || (Array.isArray(cust.staffRoleIds) && cust.staffRoleIds[0]) || '';
+      const adminMark = adminRole ? EMOJIS.CHECK : EMOJIS.CROSS;
       const adminDisplay = adminRole ? `<@&${adminRole}>` : 'Not Configured';
 
       embed.setDescription(
         '> Manage server access and authority levels for your community. Select roles below to grant permissions.\n\n' +
         '**Permissions**\n' +
-        `Staff Role: ${staffDisplay}\n` +
-        `Admin Role: ${adminDisplay}`
+        `${staffMark} Staff Role: ${staffDisplay}\n` +
+        `${adminMark} Admin Role: ${adminDisplay}`
       );
 
       // Row 1: Staff Role (Select from Discord roles directly)
@@ -254,20 +254,34 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
         ? cust.ticketCategories
         : defaultCategories;
 
+      const spawnCatId = cust.ticketSpawnCategoryId || categories[0]?.spawnCategoryId;
+      const spawnMark = spawnCatId ? EMOJIS.CHECK : EMOJIS.CROSS;
+      const transMark = cust.transcriptsChannelId ? EMOJIS.CHECK : EMOJIS.CROSS;
+      const claimMark = cust.ticketClaimRoleId ? EMOJIS.CHECK : EMOJIS.CROSS;
+
       embed.setDescription(
-        '> Support desk configuration and transcript archiving.\n\n' +
-        '**Ticket Categories**\n' +
-        `Slot 1: ${categories[0]?.name || 'General Support'}\n` +
-        `Slot 2: ${categories[1]?.name || 'High Rank'}\n` +
-        `Slot 3: ${categories[2]?.name || 'Player Report'}\n` +
-        `Slot 4: ${categories[3]?.name || 'Appeals'}\n` +
-        `Slot 5: ${categories[4]?.name || 'Other'}\n\n` +
-        '**Transcripts & Claiming**\n' +
-        `Transcripts Channel: ${chanRef(cust.transcriptsChannelId)}\n` +
-        `Claim Role: ${roleRef(cust.ticketClaimRoleId)}`
+        '> Support desk routing, category channels, and appearance styling.\n\n' +
+        '**Ticket Routing & Access**\n' +
+        `${spawnMark} Spawn Category: ${chanRef(spawnCatId)}\n` +
+        `${transMark} Transcripts: ${chanRef(cust.transcriptsChannelId)}\n` +
+        `${claimMark} Claim Role: ${roleRef(cust.ticketClaimRoleId)}\n\n` +
+        '**Categories**\n' +
+        `1. ${categories[0]?.name || 'General Support'}\n` +
+        `2. ${categories[1]?.name || 'High Rank'}\n` +
+        `3. ${categories[2]?.name || 'Player Report'}\n` +
+        `4. ${categories[3]?.name || 'Appeals'}\n` +
+        `5. ${categories[4]?.name || 'Other'}`
       );
 
-      // Row 1: Transcripts Channel (Select text channel directly)
+      // Row 1: Category Spawn Channel (Select category/channel directly - NO ID TYPING)
+      rows.push(new ActionRowBuilder().addComponents(
+        new ChannelSelectMenuBuilder()
+          .setCustomId(`cfg_chan_ticketspawn_${botId}`)
+          .setPlaceholder('Select Ticket Spawn Category / Channel')
+          .setChannelTypes(ChannelType.GuildCategory, ChannelType.GuildText)
+      ));
+
+      // Row 2: Transcripts Channel (Select text channel directly - NO ID TYPING)
       rows.push(new ActionRowBuilder().addComponents(
         new ChannelSelectMenuBuilder()
           .setCustomId(`cfg_chan_transcripts_${botId}`)
@@ -275,27 +289,27 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
           .setChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
       ));
 
-      // Row 2: Ticket Claim Role (Select role directly)
+      // Row 3: Ticket Claim Role (Select role directly - NO ID TYPING)
       rows.push(new ActionRowBuilder().addComponents(
         new RoleSelectMenuBuilder()
           .setCustomId(`cfg_role_claim_${botId}`)
           .setPlaceholder('Select Ticket Claim Role')
       ));
 
-      // Row 3: Category Names Option Menu
+      // Row 4: Appearance & Category Options (Appearance integrated right here)
       rows.push(new ActionRowBuilder().addComponents(
         new StringSelectMenuBuilder()
           .setCustomId(`cfg_index_${botId}_2`)
-          .setPlaceholder('Category Options')
+          .setPlaceholder('Appearance & Category Settings')
           .addOptions([
             { label: 'Rename Category Slots', value: 'edit_ticket_catnames', description: 'Customize category display names' },
-            { label: 'Category Spawn Channels', value: 'edit_ticket_catspawns', description: 'Where tickets are opened' },
-            { label: 'Category Alert Roles', value: 'edit_ticket_catpings', description: 'Roles alerted when opened' }
+            { label: 'Panel Headline & Description', value: 'edit_ticket_text', description: 'Customize ticket center title and text' },
+            { label: 'Header & Bottom Banners', value: 'edit_ticket_banners', description: 'Set artwork image links' },
+            { label: 'Rules Button & Greeting', value: 'edit_rules_greeting', description: 'Rules modal and greeting text' },
+            { label: 'Staff Notification Pings', value: 'edit_ticket_catpings', description: 'Roles alerted when opened' },
+            { label: 'Reset to Defaults', value: 'reset_ticket_categories', description: 'Restore default categories & style' }
           ])
       ));
-
-      // Row 4: Modules Dropdown
-      rows.push(buildModulesDropdown(botId));
 
       // Row 5: Navigation Button Row
       rows.push(buildNavButtonRow(botId, 2));
@@ -339,13 +353,17 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
     // PAGE 4: LIVE SESSIONS
     // ══════════════════════════════════════════════════════════════════════
     case 4: {
+      const sesMark = cust.sessionChannelId ? EMOJIS.CHECK : EMOJIS.CROSS;
+      const hostMark = cust.hostRoleId ? EMOJIS.CHECK : EMOJIS.CROSS;
+      const notifMark = cust.notificationRoleId ? EMOJIS.CHECK : EMOJIS.CROSS;
+
       embed.setDescription(
         '> Patrol announcements, radio channels, and host roles.\n\n' +
         '**Patrol Channels & Roles**\n' +
-        `Announcement Channel: ${chanRef(cust.sessionChannelId)}\n` +
+        `${sesMark} Announcement Channel: ${chanRef(cust.sessionChannelId)}\n` +
         `In-Game Radio VC: ${chanRef(cust.ingameVcId)}\n` +
-        `Host Role: ${roleRef(cust.hostRoleId)}\n` +
-        `Notification Role: ${roleRef(cust.notificationRoleId)}\n\n` +
+        `${hostMark} Host Role: ${roleRef(cust.hostRoleId)}\n` +
+        `${notifMark} Notification Role: ${roleRef(cust.notificationRoleId)}\n\n` +
         '**Connection**\n' +
         `Join Code: ${cust.joinCode || 'Not Set'}\n` +
         `ER:LC API: ${bot.erlcApiKey ? 'Connected' : 'Not Set'}`
@@ -382,11 +400,14 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
     // PAGE 5: STAFF APPLICATIONS
     // ══════════════════════════════════════════════════════════════════════
     case 5: {
+      const revMark = cust.reviewChannelId ? EMOJIS.CHECK : EMOJIS.CROSS;
+      const resMark = cust.resultsChannelId ? EMOJIS.CHECK : EMOJIS.CROSS;
+
       embed.setDescription(
         '> Staff recruitment pipelines and candidate evaluation feeds.\n\n' +
         '**Review Feeds**\n' +
-        `Review Channel: ${chanRef(cust.reviewChannelId)}\n` +
-        `Results Feed: ${chanRef(cust.resultsChannelId)}\n\n` +
+        `${revMark} Review Channel: ${chanRef(cust.reviewChannelId)}\n` +
+        `${resMark} Results Feed: ${chanRef(cust.resultsChannelId)}\n\n` +
         '**Pipeline Status**\n' +
         `In-Game Moderation: ${cust.appIngameOpen !== false ? 'Open' : 'Closed'}\n` +
         `Discord Moderation: ${cust.appDiscordOpen !== false ? 'Open' : 'Closed'}`
@@ -417,10 +438,12 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
     // PAGE 6: STAFF DOCUMENTATION
     // ══════════════════════════════════════════════════════════════════════
     case 6: {
+      const docMark = cust.staffDocsChannelId ? EMOJIS.CHECK : EMOJIS.CROSS;
+
       embed.setDescription(
         '> Staff guidelines, handbook, and operational protocols.\n\n' +
         '**Documentation Hub**\n' +
-        `Destination Channel: ${chanRef(cust.staffDocsChannelId)}\n` +
+        `${docMark} Destination Channel: ${chanRef(cust.staffDocsChannelId)}\n` +
         `Layout Mode: ${cust.staffDocsLayout === 'buttons' ? 'Buttons' : 'Select Menu'}\n` +
         `Hub Title: ${cust.staffDocsTitle || 'Staff Documentation'}`
       );
@@ -452,13 +475,17 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
     // PAGE 7: COMMUNITY & TRACKING
     // ══════════════════════════════════════════════════════════════════════
     case 7: {
+      const infChanMark = cust.infractionsChannelId ? EMOJIS.CHECK : EMOJIS.CROSS;
+      const infRoleMark = cust.infractionStaffRoleId ? EMOJIS.CHECK : EMOJIS.CROSS;
+      const promChanMark = cust.promotionsChannelId ? EMOJIS.CHECK : EMOJIS.CROSS;
+
       embed.setDescription(
         '> Disciplinary tracking, rank advancements, and engagement channels.\n\n' +
         '**Infractions**\n' +
-        `Channel: ${chanRef(cust.infractionsChannelId)}\n` +
-        `Supervisor Role: ${roleRef(cust.infractionStaffRoleId)}\n\n` +
+        `${infChanMark} Channel: ${chanRef(cust.infractionsChannelId)}\n` +
+        `${infRoleMark} Supervisor Role: ${roleRef(cust.infractionStaffRoleId)}\n\n` +
         '**Promotions**\n' +
-        `Channel: ${chanRef(cust.promotionsChannelId)}\n` +
+        `${promChanMark} Channel: ${chanRef(cust.promotionsChannelId)}\n` +
         `Promoter Role: ${roleRef(cust.promotionStaffRoleId)}\n\n` +
         '**Community Channels**\n' +
         `Forums: ${chanRef(cust.forumChannelId)}\n` +

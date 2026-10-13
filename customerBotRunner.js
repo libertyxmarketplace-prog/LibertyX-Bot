@@ -194,10 +194,16 @@ function createCustomerClient(bot, intents) {
     // Handle slash commands, buttons, and modals for this customer bot
     customerClient.on(Events.InteractionCreate, async interaction => {
       try {
-        const cid = interaction.customId || '';
-        if (cid.startsWith('cfg_')) return;
-        const MASTER_CMDS = ['config', 'banbot', 'createbot', 'unbanbot', 'listbots'];
-        if (interaction.isChatInputCommand() && MASTER_CMDS.includes(interaction.commandName)) return;
+        const MASTER_CMDS = ['banbot', 'createbot', 'unbanbot', 'listbots'];
+        if (interaction.isChatInputCommand() && MASTER_CMDS.includes(interaction.commandName)) {
+          if (interaction.isRepliable()) {
+            return interaction.reply({
+              content: `<:xmark:1552901454098989056> \`/${interaction.commandName}\` is an administrative command for the central system.`,
+              flags: 64
+            }).catch(() => null);
+          }
+          return;
+        }
 
         const currentBot = getBotInstance(botId);
         if (!currentBot || currentBot.banned) {

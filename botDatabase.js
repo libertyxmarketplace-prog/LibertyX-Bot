@@ -139,12 +139,13 @@ class BotDatabase {
     this.writeLock = true;
     try {
       const serialized = JSON.stringify(Object.fromEntries(this.cache), null, 2);
+      const tmpFile = `${DB_FILE}.tmp`;
       // 1. Write to DB_FILE
       try {
         fs.writeFileSync(tmpFile, serialized, 'utf-8');
         fs.renameSync(tmpFile, DB_FILE);
       } catch {
-        fs.writeFileSync(DB_FILE, serialized, 'utf-8');
+        try { fs.writeFileSync(DB_FILE, serialized, 'utf-8'); } catch {}
       }
 
       // 2. Sync to legacy COMPAT_FILE for backward compatibility
@@ -153,16 +154,16 @@ class BotDatabase {
         fs.writeFileSync(compatTmp, serialized, 'utf-8');
         fs.renameSync(compatTmp, COMPAT_FILE);
       } catch {
-        fs.writeFileSync(COMPAT_FILE, serialized, 'utf-8');
+        try { fs.writeFileSync(COMPAT_FILE, serialized, 'utf-8'); } catch {}
       }
 
       this.isDirty = false;
     } catch (saveErr) {
-      console.error(`[BOT DATABASE SAVE ERROR]:`, saveErr);
+      console.warn(`[BOT DATABASE SAVE WARN]:`, saveErr.message);
     } finally {
       this.writeLock = false;
       if (this.isDirty) {
-        this.save();
+        setTimeout(() => this.save(), 500);
       }
     }
   }

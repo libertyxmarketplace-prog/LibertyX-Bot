@@ -277,7 +277,7 @@ export function getOrCreateBotInstanceForUser(ownerUserId, guildId = null) {
   if (guildId) {
     for (const bot of Object.values(instances)) {
       if (bot.guildId === guildId && bot.botId !== MASTER_BOT_ID && !bot.banned && bot.token && bot.erlcApiKey && bot.erlcApiKey.length > 5) {
-        if (ownerUserId && !bot.ownerUserId) {
+        if (ownerUserId && (!bot.ownerUserId || bot.ownerUserId === 'UNASSIGNED')) {
           bot.ownerUserId = ownerUserId;
           saveBotInstances(instances);
         }
@@ -286,7 +286,7 @@ export function getOrCreateBotInstanceForUser(ownerUserId, guildId = null) {
     }
     for (const bot of Object.values(instances)) {
       if (bot.guildId === guildId && bot.botId !== MASTER_BOT_ID && !bot.banned) {
-        if (ownerUserId && !bot.ownerUserId) {
+        if (ownerUserId && (!bot.ownerUserId || bot.ownerUserId === 'UNASSIGNED')) {
           bot.ownerUserId = ownerUserId;
           saveBotInstances(instances);
         }
@@ -298,9 +298,23 @@ export function getOrCreateBotInstanceForUser(ownerUserId, guildId = null) {
   if (ownerUserId) {
     if (guildId) {
       for (const bot of Object.values(instances)) {
+        if (bot.ownerUserId === ownerUserId && bot.guildId === guildId && !bot.banned && bot.token && bot.erlcApiKey) {
+          return bot;
+        }
+      }
+      for (const bot of Object.values(instances)) {
         if (bot.ownerUserId === ownerUserId && bot.guildId === guildId && !bot.banned) {
           return bot;
         }
+      }
+    }
+    for (const bot of Object.values(instances)) {
+      if (bot.ownerUserId === ownerUserId && !bot.banned && bot.token && bot.erlcApiKey) {
+        if (guildId && !bot.guildId) {
+          bot.guildId = guildId;
+          saveBotInstances(instances);
+        }
+        return bot;
       }
     }
     for (const bot of Object.values(instances)) {

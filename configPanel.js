@@ -88,7 +88,7 @@ export function buildInitialSetupPayload(botId, bot) {
       `${hasToken ? EMOJIS.CHECK : EMOJIS.CROSS} Bot Token: ${hasToken ? 'Connected' : 'Not Configured'}\n` +
       `${hasApiKey ? EMOJIS.CHECK : EMOJIS.CROSS} ER:LC API Key: ${hasApiKey ? 'Connected' : 'Not Configured'}`
     )
-    .setThumbnail('attachment://mavely_logo.png')
+    .setThumbnail('https://cdn.discordapp.com/avatars/1552165138017165372/9c397e6df530a28a6208310c9c3491a2.png?size=256')
     .setFooter({ text: 'Initial Setup' });
 
   const buttons = [
@@ -109,15 +109,10 @@ export function buildInitialSetupPayload(botId, bot) {
 
   const row = new ActionRowBuilder().addComponents(buttons);
 
-  const files = [];
-  if (fs.existsSync(MAVELY_LOGO_PATH)) {
-    files.push(new AttachmentBuilder(MAVELY_LOGO_PATH, { name: 'mavely_logo.png' }));
-  }
-
   return {
     embeds: [embed],
     components: [row],
-    files,
+    attachments: [],
     flags: 64
   };
 }
@@ -601,6 +596,7 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = fal
   return {
     embeds: [embed],
     components: rows,
+    attachments: [],
     flags: 64
   };
 }

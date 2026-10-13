@@ -19,16 +19,15 @@ async function run() {
   const eventData = JSON.parse(fs.readFileSync(eventPath, 'utf8'));
 
   const repository = eventData.repository || {};
-  const repoName = repository.full_name || 'libertyxmarketplace-prog/ERLCXBOT';
-  const repoUrl = repository.html_url || 'https://github.com/libertyxmarketplace-prog/ERLCXBOT';
+  const repoName = repository.name || 'Mavelybot';
+  const repoUrl = repository.html_url || 'https://github.com/libertyxmarketplace-prog/Mavelybot';
 
   const ref = eventData.ref || 'refs/heads/main';
   const branch = ref.replace('refs/heads/', '');
 
   const sender = eventData.sender || {};
-  const senderLogin = sender.login || 'Developer';
-  const senderAvatar = sender.avatar_url || `https://github.com/${senderLogin}.png`;
-  const senderProfile = sender.html_url || `https://github.com/${senderLogin}`;
+  const githubUser = sender.login || 'developer';
+  const senderProfile = sender.html_url || `https://github.com/${githubUser}`;
 
   const commits = Array.isArray(eventData.commits) ? eventData.commits : [];
   if (commits.length === 0) {
@@ -39,47 +38,47 @@ async function run() {
   const commitCount = commits.length;
   const compareUrl = eventData.compare || (commits[0] ? commits[0].url : repoUrl);
 
-  // Format the commit lines (limit to last 10 if there are many)
+  // Format commit lines: NO emojis, NO personal names leaked (only GitHub handle and hash)
   const commitLines = commits.slice(0, 10).map(c => {
     const shortSha = c.id.substring(0, 7);
-    const authorName = c.author?.name || c.author?.username || senderLogin;
-    const authorUser = c.author?.username || senderLogin;
-    // Clean commit message (first line only)
-    const firstLine = (c.message || 'No commit message').split('\n')[0].trim();
-    return `• [\`${shortSha}\`](${c.url}) ${firstLine}\n  -# ${authorName} @${authorUser}`;
-  }).join('\n\n');
+    const firstLine = (c.message || 'Updated code').split('\n')[0].trim();
+    return `- [\`${shortSha}\`](${c.url}) ${firstLine}`;
+  }).join('\n');
 
-  // Format timestamp (e.g. "October 13, 2026 at 5:30 PM")
+  // Format clean date
   const now = new Date();
   const dateFormatted = now.toLocaleDateString('en-US', {
-    month: 'long',
+    month: 'short',
     day: 'numeric',
     year: 'numeric'
-  }) + ' at ' + now.toLocaleTimeString('en-US', {
+  }) + ' • ' + now.toLocaleTimeString('en-US', {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true
   });
 
+  const mavelyLogoUrl = 'https://raw.githubusercontent.com/libertyxmarketplace-prog/Mavelybot/main/assets/mavely_logo.png';
+
   const embed = {
-    color: 0xff2a4b, // Sleek Mavely crimson red
+    color: 0x1fd186, // Sleek Mavely Mint Green (#1FD186)
     author: {
-      name: 'Mavely • Development Update',
-      icon_url: 'https://raw.githubusercontent.com/libertyxmarketplace-prog/ERLCXBOT/main/assets/mavely_logo.png'
+      name: 'Mavely | Development Update',
+      icon_url: mavelyLogoUrl
     },
     thumbnail: {
-      url: senderAvatar
+      url: mavelyLogoUrl
     },
     description: [
-      `🎯 **Developer:** ${senderLogin} • [@${senderLogin}](${senderProfile})`,
-      `📁 **Repository:** [${repoName}](${repoUrl})`,
-      `🔀 \`${branch}\` • ${commitCount} commit${commitCount === 1 ? '' : 's'}`,
+      `**Developer:** [@${githubUser}](${senderProfile})`,
+      `**Repository:** [${repoName}](${repoUrl})`,
+      `**Branch:** \`${branch}\` (${commitCount} commit${commitCount === 1 ? '' : 's'})`,
       '',
-      `### ⚙️ What's changed`,
+      `**Changes**`,
       commitLines
     ].join('\n'),
     footer: {
-      text: `Mavely Development • ${dateFormatted}`
+      text: `Mavely Development • ${dateFormatted}`,
+      icon_url: mavelyLogoUrl
     }
   };
 
@@ -88,19 +87,19 @@ async function run() {
     embeds: [embed],
     components: [
       {
-        type: 1, // ActionRow
+        type: 1,
         components: [
           {
-            type: 2, // Button
-            style: 5, // Link button
-            label: 'View changes',
+            type: 2,
+            style: 5,
+            label: 'View Changes',
             url: compareUrl
           },
           {
-            type: 2, // Button
-            style: 5, // Link button
-            label: 'Developer profile',
-            url: senderProfile
+            type: 2,
+            style: 5,
+            label: 'Repository',
+            url: repoUrl
           }
         ]
       }
@@ -116,23 +115,17 @@ async function run() {
     });
 
     if (!res.ok) {
-      const errText = await res.text();
-      console.error(`Failed to send Discord webhook: ${res.status} ${errText}`);
-      // Fallback without components if webhook doesn't support link buttons on specific webhook type
-      const fallbackPayload = {
-        content: payload.content,
-        embeds: payload.embeds
-      };
+      console.log('Retrying without components...');
       await fetch(webhookUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(fallbackPayload)
+        body: JSON.stringify({ content: payload.content, embeds: payload.embeds })
       });
     } else {
       console.log('Successfully posted update to Discord!');
     }
   } else if (botToken && channelId) {
-    console.log(`Sending update via Discord Bot REST API to channel ${channelId}...`);
+    console.log(`Sending update via Discord Bot API to channel ${channelId}...`);
     const res = await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
       method: 'POST',
       headers: {

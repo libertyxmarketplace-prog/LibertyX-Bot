@@ -76,16 +76,17 @@ function roleRef(id) {
 export function buildInitialSetupPayload(botId, bot) {
   const isOnline = bot?.status === 'active' && Boolean(bot?.token && bot.token.trim().length > 0);
   const isInvalid = bot?.status === 'invalid_token';
+  const hasToken = Boolean(bot?.token && bot.token.trim().length > 0);
   const hasApiKey = Boolean(bot?.erlcApiKey && bot.erlcApiKey.trim().length > 0);
-  const isSetupComplete = isOnline && hasApiKey;
+  const hasCredentials = hasToken && hasApiKey;
 
   let tokenStatusText = 'Not Configured';
   let tokenMark = EMOJIS.CROSS;
   if (isOnline) {
     tokenStatusText = 'Connected';
     tokenMark = EMOJIS.CHECK;
-  } else if (isInvalid) {
-    tokenStatusText = 'Invalid Token (Reset in Dev Portal)';
+  } else if (hasToken) {
+    tokenStatusText = isInvalid ? 'Offline (Verification Failed)' : 'Connecting...';
     tokenMark = EMOJIS.CROSS;
   }
 
@@ -94,7 +95,7 @@ export function buildInitialSetupPayload(botId, bot) {
   ];
 
   if (isInvalid) {
-    descLines.push('', '> ⚠️ **Invalid Bot Token**: Discord rejected this token. Go to **Discord Developer Portal → Bot → Reset Token**, copy your new token, and paste it below.');
+    descLines.push('', '> **Notice**: Discord could not verify this bot token. You can update your token anytime using the button below.');
   }
 
   descLines.push(
@@ -105,7 +106,7 @@ export function buildInitialSetupPayload(botId, bot) {
   );
 
   const embed = new EmbedBuilder()
-    .setColor(isInvalid ? 0xED4245 : 0x2b2d31)
+    .setColor(0x2b2d31)
     .setTitle('Initial Setup')
     .setDescription(descLines.join('\n'))
     .setThumbnail('https://cdn.discordapp.com/avatars/1552165138017165372/9c397e6df530a28a6208310c9c3491a2.png?size=256')
@@ -122,8 +123,8 @@ export function buildInitialSetupPayload(botId, bot) {
   const buttons = [
     new ButtonBuilder()
       .setCustomId(`cfg_btn_initial_setup_${botId}`)
-      .setLabel(isInvalid ? 'Retry Setup Credentials' : 'Setup Credentials')
-      .setStyle(isInvalid ? ButtonStyle.Danger : ButtonStyle.Success)
+      .setLabel(hasToken ? 'Update Credentials' : 'Setup Credentials')
+      .setStyle(ButtonStyle.Success)
   ];
 
   if (derivedClientId) {
@@ -135,7 +136,7 @@ export function buildInitialSetupPayload(botId, bot) {
     );
   }
 
-  if (isSetupComplete) {
+  if (hasCredentials || isOnline) {
     buttons.push(
       new ButtonBuilder()
         .setCustomId(`cfg_btn_skip_setup_${botId}`)
@@ -260,7 +261,8 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = fal
       const hasApiKey = Boolean(bot?.erlcApiKey && bot.erlcApiKey.trim().length > 0);
 
       const tokenMark = isOnline ? EMOJIS.CHECK : EMOJIS.CROSS;
-      const tokenText = isOnline ? 'Connected' : (isInvalid ? 'Invalid Token (Reset in Dev Portal)' : 'Not Configured');
+      const hasToken = Boolean(bot?.token && bot.token.trim().length > 0);
+      const tokenText = isOnline ? 'Connected' : (hasToken ? (isInvalid ? 'Offline (Verification Failed)' : 'Connecting...') : 'Not Configured');
       const apiKeyMark = hasApiKey ? EMOJIS.CHECK : EMOJIS.CROSS;
 
       const staffMark = cust.botStaffRoleId ? EMOJIS.CHECK : EMOJIS.CROSS;

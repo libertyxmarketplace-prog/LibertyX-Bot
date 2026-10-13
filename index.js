@@ -2110,7 +2110,7 @@ export async function handleInteraction(interaction) {
 
         const isOnline = targetBot.status === 'active' && Boolean(targetBot.token && targetBot.token.trim().length > 0);
         const hasApiKey = Boolean(targetBot.erlcApiKey && targetBot.erlcApiKey.trim().length > 0);
-        const isSetupComplete = targetBot.setupCompleted && isOnline && hasApiKey;
+        const isSetupComplete = targetBot.setupCompleted || (hasToken && hasApiKey) || (isOnline && hasApiKey);
 
         const payload = isSetupComplete
           ? buildConfigPanelPayload(targetBot.botId, requestedPage, false, interaction.guild)
@@ -3983,7 +3983,7 @@ export async function handleInteraction(interaction) {
         const currentBot = getBotInstance(botId);
         const isOnline = currentBot?.status === 'active';
         const hasApiKey = Boolean(currentBot?.erlcApiKey && currentBot.erlcApiKey.trim().length > 0);
-        const payload = (isOnline && hasApiKey)
+        const payload = (hasToken && hasApiKey)
           ? buildConfigPanelPayload(botId, 1, false, interaction.guild)
           : buildInitialSetupPayload(botId, currentBot);
         return interaction.editReply(payload).catch(() => null);

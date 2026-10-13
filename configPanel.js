@@ -25,7 +25,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const MAVELY_LOGO_PATH = path.join(__dirname, 'assets', 'mavely_logo.png');
 
-export const TOTAL_PAGES = 8;
+export const TOTAL_PAGES = 7;
 
 export const EMOJIS = {
   LEFT: '1552907890681970688',
@@ -127,13 +127,12 @@ function buildModulesDropdown(botId) {
       .setPlaceholder('Jump to Module')
       .addOptions([
         { label: 'Permissions & Access', value: 'nav_page_1', description: 'Staff and administrator permissions' },
-        { label: 'Ticket Categories', value: 'nav_page_2', description: 'Support desk categories and claiming' },
-        { label: 'Ticket Appearance', value: 'nav_page_3', description: 'Panel headline, rules button, and banners' },
-        { label: 'Live Sessions', value: 'nav_page_4', description: 'ER:LC patrol announcements and radios' },
-        { label: 'Staff Applications', value: 'nav_page_5', description: 'Recruitment intake and review channels' },
-        { label: 'Staff Documentation', value: 'nav_page_6', description: 'Staff handbook and policies hub' },
-        { label: 'Community Tracking', value: 'nav_page_7', description: 'Infractions, promotions, forums, questions' },
-        { label: 'AI Assistant', value: 'nav_page_8', description: 'Automated configuration with AI' }
+        { label: 'Ticket System & Appearance', value: 'nav_page_2', description: 'Categories, routing, and panel styling' },
+        { label: 'Live Sessions', value: 'nav_page_3', description: 'ER:LC patrol announcements and radios' },
+        { label: 'Staff Applications', value: 'nav_page_4', description: 'Recruitment intake and review channels' },
+        { label: 'Staff Documentation', value: 'nav_page_5', description: 'Staff handbook and policies hub' },
+        { label: 'Community Tracking', value: 'nav_page_6', description: 'Infractions, promotions, forums, questions' },
+        { label: 'AI Assistant', value: 'nav_page_7', description: 'Automated configuration with AI' }
       ])
   );
 }
@@ -224,7 +223,8 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = fal
       const adminMark = adminRole ? EMOJIS.CHECK : EMOJIS.CROSS;
       const adminDisplay = adminRole ? `<@&${adminRole}>` : 'Not Configured';
 
-      const actText = cust.botActivityText?.trim() || 'ER:LC';
+      const defaultPromo = cust.serverName ? `${cust.serverName} | Code: ${cust.joinCode || 'Join'}` : 'Orlando Roleplay | Join Now';
+      const actText = cust.botActivityText?.trim() || defaultPromo;
 
       embed.setDescription(
         '> Manage server access and authority levels for your community. Select roles below to grant permissions.\n\n' +
@@ -270,7 +270,7 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = fal
     }
 
     // ══════════════════════════════════════════════════════════════════════
-    // PAGE 2: TICKET CATEGORIES
+    // PAGE 2: TICKET CATEGORIES & APPEARANCE
     // ══════════════════════════════════════════════════════════════════════
     case 2: {
       const defaultCategories = [
@@ -280,32 +280,41 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = fal
         { id: 'cat_4', name: 'Appeals', spawnCategoryId: '', pingRoleId: '' },
         { id: 'cat_5', name: 'Other', spawnCategoryId: '', pingRoleId: '' }
       ];
-      const categories = Array.isArray(cust.ticketCategories) && cust.ticketCategories.length > 0
+      const rawCategories = Array.isArray(cust.ticketCategories) && cust.ticketCategories.length > 0
         ? cust.ticketCategories
         : defaultCategories;
 
-      const spawnCatId = cust.ticketSpawnCategoryId || categories[0]?.spawnCategoryId;
+      // Filter out any removed / blank categories
+      const categories = rawCategories.filter(c => c && typeof c.name === 'string' && c.name.trim().length > 0);
+      const displayCats = categories.length > 0 ? categories : defaultCategories.slice(0, 1);
+
+      const spawnCatId = cust.ticketSpawnCategoryId || displayCats[0]?.spawnCategoryId;
       const spawnMark = spawnCatId ? EMOJIS.CHECK : EMOJIS.CROSS;
-      const transMark = cust.transcriptsChannelId ? EMOJIS.CHECK : EMOJIS.CROSS;
-      const claimMark = cust.ticketClaimRoleId ? EMOJIS.CHECK : EMOJIS.CROSS;
+
+      const catsList = displayCats
+        .map((c, i) => `${i + 1}. **${c.name}** ${c.spawnCategoryId ? `→ <#${c.spawnCategoryId}>` : ''}`)
+        .join('\n');
+
+      const bannerStatus = cust.topBannerUrl ? 'Custom' : 'Not Set (Optional)';
+      const insideStatus = cust.ticketInsideBannerUrl ? 'Custom' : 'Not Set (Optional)';
+      const rulesStatus = cust.showRulesButton !== false ? (cust.rulesButtonLabel || 'Server Guidelines') : 'Disabled';
 
       embed.setDescription(
         '> Support desk routing, category channels, and appearance styling.\n\n' +
-        '**Ticket Routing & Access**\n' +
-        `${spawnMark} Spawn Category: ${chanRef(spawnCatId)}\n` +
-        `${transMark} Transcripts: ${chanRef(cust.transcriptsChannelId)}\n` +
-        `${claimMark} Claim Role: ${roleRef(cust.ticketClaimRoleId)}\n\n` +
-        '**Categories**\n' +
-        `1. ${categories[0]?.name || 'General Support'}\n` +
-        `2. ${categories[1]?.name || 'High Rank'}\n` +
-        `3. ${categories[2]?.name || 'Player Report'}\n` +
-        `4. ${categories[3]?.name || 'Appeals'}\n` +
-        `5. ${categories[4]?.name || 'Other'}\n\n` +
+        '**Ticket Routing**\n' +
+        `${spawnMark} Spawn Category: ${chanRef(spawnCatId)}\n\n` +
+        '**Active Categories**\n' +
+        `${catsList}\n\n` +
+        '**Panel Appearance**\n' +
+        `Title: ${cust.panelTitle || 'Support'}\n` +
+        `Top Banner: ${bannerStatus}\n` +
+        `Header Banner: ${insideStatus}\n` +
+        `Rules Button: ${rulesStatus}\n\n` +
         '**Assistant**\n' +
         'Need help? Click the **Helper** button below for guidance.'
       );
 
-      // Row 1: Category Spawn Channel (Select category/channel directly - NO ID TYPING)
+      // Row 1: Category Spawn Channel (Native Channel Select Menu)
       rows.push(new ActionRowBuilder().addComponents(
         new ChannelSelectMenuBuilder()
           .setCustomId(`cfg_chan_ticketspawn_${botId}`)
@@ -313,78 +322,34 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = fal
           .setChannelTypes(ChannelType.GuildCategory, ChannelType.GuildText)
       ));
 
-      // Row 2: Transcripts Channel (Select text channel directly - NO ID TYPING)
-      rows.push(new ActionRowBuilder().addComponents(
-        new ChannelSelectMenuBuilder()
-          .setCustomId(`cfg_chan_transcripts_${botId}`)
-          .setPlaceholder('Select Transcripts Channel')
-          .setChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
-      ));
-
-      // Row 3: Ticket Claim Role (Select role directly - NO ID TYPING)
-      rows.push(new ActionRowBuilder().addComponents(
-        new RoleSelectMenuBuilder()
-          .setCustomId(`cfg_role_claim_${botId}`)
-          .setPlaceholder('Select Ticket Claim Role')
-      ));
-
-      // Row 4: Appearance & Category Options (Appearance integrated right here)
+      // Row 2: Appearance & Category Settings dropdown
       rows.push(new ActionRowBuilder().addComponents(
         new StringSelectMenuBuilder()
           .setCustomId(`cfg_index_${botId}_2`)
           .setPlaceholder('Appearance & Category Settings')
           .addOptions([
-            { label: 'Rename Category Slots', value: 'edit_ticket_catnames', description: 'Customize category display names' },
-            { label: 'Panel Headline & Description', value: 'edit_ticket_text', description: 'Customize ticket center title and text' },
-            { label: 'Header & Bottom Banners', value: 'edit_ticket_banners', description: 'Set artwork image links' },
-            { label: 'Rules Button & Greeting', value: 'edit_rules_greeting', description: 'Rules modal and greeting text' },
-            { label: 'Staff Notification Pings', value: 'edit_ticket_catpings', description: 'Roles alerted when opened' },
+            { label: 'Rename & Remove Categories', value: 'edit_ticket_catnames', description: 'Customize category names (leave blank to remove)' },
+            { label: 'Category Spawn Channels', value: 'edit_ticket_catspawns', description: 'Configure spawn channels for active categories' },
+            { label: 'Panel Headline & Description', value: 'edit_ticket_text', description: 'Customize title and ticket center description' },
+            { label: 'Header & Bottom Banners', value: 'edit_ticket_banners', description: 'Set panel top banner and inside header (optional)' },
+            { label: 'Rules Button & Greeting', value: 'edit_rules_greeting', description: 'Rules button label and greeting message' },
+            { label: 'Staff Notification Pings', value: 'edit_ticket_catpings', description: 'Roles alerted when tickets open' },
             { label: 'Reset to Defaults', value: 'reset_ticket_categories', description: 'Restore default categories & style' }
           ])
       ));
 
-      // Row 5: Navigation Button Row
+      // Row 3: Modules Dropdown
+      rows.push(buildModulesDropdown(botId));
+
+      // Row 4: Navigation Button Row
       rows.push(buildNavButtonRow(botId, 2));
       break;
     }
 
     // ══════════════════════════════════════════════════════════════════════
-    // PAGE 3: TICKET APPEARANCE
+    // PAGE 3: LIVE SESSIONS
     // ══════════════════════════════════════════════════════════════════════
     case 3: {
-      embed.setDescription(
-        '> Customize ticket panel display, rules button, and banner artwork.\n\n' +
-        '**Panel Display**\n' +
-        `Title: ${cust.panelTitle || 'Mavely Support'}\n` +
-        `Rules Button: ${cust.showRulesButton !== false ? 'Enabled' : 'Disabled'}\n` +
-        `Rules Content: ${cust.rulesDescription ? 'Custom' : 'Standard'}\n` +
-        `Greeting Message: ${cust.ticketOpenMessage ? 'Custom' : 'Standard'}\n\n` +
-        '**Artwork**\n' +
-        `Top Banner: ${cust.topBannerUrl ? 'Custom' : 'Default'}\n` +
-        `Bottom Accent: ${cust.bottomBannerUrl ? 'Custom' : 'Default'}`
-      );
-
-      rows.push(new ActionRowBuilder().addComponents(
-        new StringSelectMenuBuilder()
-          .setCustomId(`cfg_index_${botId}_3`)
-          .setPlaceholder('Appearance Settings')
-          .addOptions([
-            { label: 'Panel Headline Text', value: 'edit_ticket_text', description: 'Customize ticket center title and welcome text' },
-            { label: 'Rules & Greeting', value: 'edit_rules_greeting', description: 'Rules button label and guidance modal' },
-            { label: 'Header & Bottom Banners', value: 'edit_ticket_banners', description: 'Set artwork image links' },
-            { label: 'Reset Banners', value: 'reset_banners', description: 'Restore default Mavely graphics' }
-          ])
-      ));
-
-      rows.push(buildModulesDropdown(botId));
-      rows.push(buildNavButtonRow(botId, 3));
-      break;
-    }
-
-    // ══════════════════════════════════════════════════════════════════════
-    // PAGE 4: LIVE SESSIONS
-    // ══════════════════════════════════════════════════════════════════════
-    case 4: {
       const sesMark = cust.sessionChannelId ? EMOJIS.CHECK : EMOJIS.CROSS;
       const hostMark = cust.hostRoleId ? EMOJIS.CHECK : EMOJIS.CROSS;
       const notifMark = cust.notificationRoleId ? EMOJIS.CHECK : EMOJIS.CROSS;
@@ -424,14 +389,14 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = fal
       ));
 
       rows.push(buildModulesDropdown(botId));
-      rows.push(buildNavButtonRow(botId, 4));
+      rows.push(buildNavButtonRow(botId, 3));
       break;
     }
 
     // ══════════════════════════════════════════════════════════════════════
-    // PAGE 5: STAFF APPLICATIONS
+    // PAGE 4: STAFF APPLICATIONS
     // ══════════════════════════════════════════════════════════════════════
-    case 5: {
+    case 4: {
       const revMark = cust.reviewChannelId ? EMOJIS.CHECK : EMOJIS.CROSS;
       const resMark = cust.resultsChannelId ? EMOJIS.CHECK : EMOJIS.CROSS;
 
@@ -462,14 +427,14 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = fal
       ));
 
       rows.push(buildModulesDropdown(botId));
-      rows.push(buildNavButtonRow(botId, 5));
+      rows.push(buildNavButtonRow(botId, 4));
       break;
     }
 
     // ══════════════════════════════════════════════════════════════════════
-    // PAGE 6: STAFF DOCUMENTATION
+    // PAGE 5: STAFF DOCUMENTATION
     // ══════════════════════════════════════════════════════════════════════
-    case 6: {
+    case 5: {
       const docMark = cust.staffDocsChannelId ? EMOJIS.CHECK : EMOJIS.CROSS;
 
       embed.setDescription(
@@ -499,14 +464,14 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = fal
       ));
 
       rows.push(buildModulesDropdown(botId));
-      rows.push(buildNavButtonRow(botId, 6));
+      rows.push(buildNavButtonRow(botId, 5));
       break;
     }
 
     // ══════════════════════════════════════════════════════════════════════
-    // PAGE 7: COMMUNITY & TRACKING
+    // PAGE 6: COMMUNITY & TRACKING
     // ══════════════════════════════════════════════════════════════════════
-    case 7: {
+    case 6: {
       const infChanMark = cust.infractionsChannelId ? EMOJIS.CHECK : EMOJIS.CROSS;
       const infRoleMark = cust.infractionStaffRoleId ? EMOJIS.CHECK : EMOJIS.CROSS;
       const promChanMark = cust.promotionsChannelId ? EMOJIS.CHECK : EMOJIS.CROSS;
@@ -548,14 +513,14 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = fal
       ));
 
       rows.push(buildModulesDropdown(botId));
-      rows.push(buildNavButtonRow(botId, 7));
+      rows.push(buildNavButtonRow(botId, 6));
       break;
     }
 
     // ══════════════════════════════════════════════════════════════════════
-    // PAGE 8: MAVELY AI ASSISTANT
+    // PAGE 7: MAVELY AI ASSISTANT
     // ══════════════════════════════════════════════════════════════════════
-    case 8: {
+    case 7: {
       const activeAiProv = (cust.aiProvider || bot.aiProvider || 'openrouter').toUpperCase();
       const hasAiKey = Boolean(cust.aiApiKey || bot.aiApiKey);
       const activeModel = cust.aiModel || (activeAiProv === 'GEMINI' ? 'gemini-1.5-flash' : activeAiProv === 'GROQ' ? 'llama-3.3-70b' : 'gpt-4o-mini');
@@ -588,7 +553,7 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = fal
       ));
 
       rows.push(buildModulesDropdown(botId));
-      rows.push(buildNavButtonRow(botId, 8));
+      rows.push(buildNavButtonRow(botId, 7));
       break;
     }
   }
@@ -649,27 +614,30 @@ export function buildServerCoreModal(botId) {
     .setCustomId(`cfg_modal_servercore_${botId}`)
     .setTitle('Server Identity & Join Code');
 
+  const autoName = cust.serverName?.trim() || 'Orlando Roleplay I Strict I Liveries';
+  const autoJoin = cust.joinCode?.trim() || 'ORLERLC';
+
   const nameInput = new TextInputBuilder()
     .setCustomId('serverName')
     .setLabel('In-Game Server Name')
     .setStyle(TextInputStyle.Short)
-    .setPlaceholder('e.g. Liberty County Roleplay')
+    .setPlaceholder('e.g. Orlando Roleplay')
     .setRequired(false);
-  if (cust.serverName?.trim()) nameInput.setValue(cust.serverName.trim());
+  nameInput.setValue(autoName);
 
   const joinInput = new TextInputBuilder()
     .setCustomId('joinCode')
     .setLabel('Server Join Code')
     .setStyle(TextInputStyle.Short)
-    .setPlaceholder('e.g. LCRP')
+    .setPlaceholder('e.g. ORLERLC')
     .setRequired(false);
-  if (cust.joinCode?.trim()) joinInput.setValue(cust.joinCode.trim());
+  joinInput.setValue(autoJoin);
 
   const activityInput = new TextInputBuilder()
     .setCustomId('botActivityText')
-    .setLabel('Bot Status Activity (replaces ER:LC)')
+    .setLabel('Bot Status Activity (Custom Presence)')
     .setStyle(TextInputStyle.Short)
-    .setPlaceholder('e.g. Liberty County (Default: ER:LC)')
+    .setPlaceholder(`e.g. ${autoName} | Code: ${autoJoin}`)
     .setRequired(false);
   if (cust.botActivityText?.trim()) activityInput.setValue(cust.botActivityText.trim());
 
@@ -692,15 +660,15 @@ export function buildTicketCategoryNamesModal(botId) {
 
   const modal = new ModalBuilder()
     .setCustomId(`cfg_modal_ticketcatnames_${botId}`)
-    .setTitle('Ticket Category Names (1-5)');
+    .setTitle('Rename Categories (Blank = Remove)');
 
   for (let i = 1; i <= 5; i++) {
     const existing = currentCats[i - 1]?.name || '';
     const input = new TextInputBuilder()
       .setCustomId(`cat_name_${i}`)
-      .setLabel(`Category ${i} Name (Leave empty to disable)`)
+      .setLabel(`Category ${i} Name (Leave empty to remove)`)
       .setStyle(TextInputStyle.Short)
-      .setPlaceholder(i === 1 ? 'General Support' : i === 2 ? 'High Rank' : `Category ${i}`)
+      .setPlaceholder(i === 1 ? 'General Support' : i === 2 ? 'High Rank' : `Category ${i} (Optional)`)
       .setRequired(false);
     if (existing) input.setValue(existing);
     modal.addComponents(new ActionRowBuilder().addComponents(input));
@@ -715,20 +683,25 @@ export function buildTicketCategoryNamesModal(botId) {
 export function buildTicketCategorySpawnsModal(botId) {
   const bot = getBotInstance(botId);
   const cust = bot?.customizations || {};
-  const currentCats = Array.isArray(cust.ticketCategories) ? cust.ticketCategories : [];
+  const allCats = Array.isArray(cust.ticketCategories) && cust.ticketCategories.length > 0
+    ? cust.ticketCategories
+    : [{ id: 'cat_1', name: 'General Support', spawnCategoryId: cust.ticketSpawnCategoryId || '' }];
+  const activeCats = allCats.filter(c => c && typeof c.name === 'string' && c.name.trim().length > 0);
+  const displayCats = activeCats.length > 0 ? activeCats : allCats.slice(0, 1);
 
   const modal = new ModalBuilder()
     .setCustomId(`cfg_modal_ticketcatspawns_${botId}`)
     .setTitle('Category Spawn Channels');
 
-  for (let i = 1; i <= 5; i++) {
-    const catName = currentCats[i - 1]?.name || `Category ${i}`;
-    const existing = currentCats[i - 1]?.spawnCategoryId || '';
+  for (let i = 0; i < displayCats.length && i < 5; i++) {
+    const cat = displayCats[i];
+    const catName = cat.name || `Category ${i + 1}`;
+    const existing = cat.spawnCategoryId || cust.ticketSpawnCategoryId || '';
     const input = new TextInputBuilder()
-      .setCustomId(`cat_spawn_${i}`)
-      .setLabel(`${catName.slice(0, 20)} Category ID`)
+      .setCustomId(`cat_spawn_${i + 1}`)
+      .setLabel(`${catName.slice(0, 20)} Spawn Category ID`)
       .setStyle(TextInputStyle.Short)
-      .setPlaceholder('Discord Category ID where ticket opens')
+      .setPlaceholder('Discord Category ID or Channel ID')
       .setRequired(false);
     if (existing) input.setValue(existing);
     modal.addComponents(new ActionRowBuilder().addComponents(input));
@@ -743,17 +716,22 @@ export function buildTicketCategorySpawnsModal(botId) {
 export function buildTicketCategoryPingsModal(botId) {
   const bot = getBotInstance(botId);
   const cust = bot?.customizations || {};
-  const currentCats = Array.isArray(cust.ticketCategories) ? cust.ticketCategories : [];
+  const allCats = Array.isArray(cust.ticketCategories) && cust.ticketCategories.length > 0
+    ? cust.ticketCategories
+    : [{ id: 'cat_1', name: 'General Support', pingRoleId: '' }];
+  const activeCats = allCats.filter(c => c && typeof c.name === 'string' && c.name.trim().length > 0);
+  const displayCats = activeCats.length > 0 ? activeCats : allCats.slice(0, 1);
 
   const modal = new ModalBuilder()
     .setCustomId(`cfg_modal_ticketcatpings_${botId}`)
     .setTitle('Category Alert Roles');
 
-  for (let i = 1; i <= 5; i++) {
-    const catName = currentCats[i - 1]?.name || `Category ${i}`;
-    const existing = currentCats[i - 1]?.pingRoleId || '';
+  for (let i = 0; i < displayCats.length && i < 5; i++) {
+    const cat = displayCats[i];
+    const catName = cat.name || `Category ${i + 1}`;
+    const existing = cat.pingRoleId || '';
     const input = new TextInputBuilder()
-      .setCustomId(`cat_ping_${i}`)
+      .setCustomId(`cat_ping_${i + 1}`)
       .setLabel(`${catName.slice(0, 20)} Role ID`)
       .setStyle(TextInputStyle.Short)
       .setPlaceholder('Staff Role ID to ping when opened')

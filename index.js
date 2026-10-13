@@ -3416,7 +3416,7 @@ export async function handleInteraction(interaction) {
     /* ---------------------------------------------------------------------- */
     /* 2. CATEGORY SELECT MENU (TICKET CREATION MODAL TRIGGER)                */
     /* ---------------------------------------------------------------------- */
-    if (interaction.isStringSelectMenu()) {
+    if (interaction.isAnySelectMenu()) {
       // Unified V2 Panel Menu - Panel Dispatch Selector
       if (interaction.customId.startsWith('panel_menu_select_')) {
         const chanIdRaw = interaction.customId.replace('panel_menu_select_', '');
@@ -3565,7 +3565,7 @@ export async function handleInteraction(interaction) {
         const botId = interaction.customId.replace('cfg_chan_session_', '');
         const val = interaction.values?.[0] || '';
         updateBotCustomization(botId, 'sessionChannelId', val);
-        const payload = buildConfigPanelPayload(botId, 4, false, interaction.guild);
+        const payload = buildConfigPanelPayload(botId, 3, false, interaction.guild);
         return interaction.update(payload).catch(async () => interaction.editReply(payload).catch(() => null));
       }
 
@@ -3573,7 +3573,7 @@ export async function handleInteraction(interaction) {
         const botId = interaction.customId.replace('cfg_role_host_', '');
         const val = interaction.values?.[0] || '';
         updateBotCustomization(botId, 'hostRoleId', val);
-        const payload = buildConfigPanelPayload(botId, 4, false, interaction.guild);
+        const payload = buildConfigPanelPayload(botId, 3, false, interaction.guild);
         return interaction.update(payload).catch(async () => interaction.editReply(payload).catch(() => null));
       }
 
@@ -3581,7 +3581,7 @@ export async function handleInteraction(interaction) {
         const botId = interaction.customId.replace('cfg_role_notif_', '');
         const val = interaction.values?.[0] || '';
         updateBotCustomization(botId, 'notificationRoleId', val);
-        const payload = buildConfigPanelPayload(botId, 4, false, interaction.guild);
+        const payload = buildConfigPanelPayload(botId, 3, false, interaction.guild);
         return interaction.update(payload).catch(async () => interaction.editReply(payload).catch(() => null));
       }
 
@@ -3589,7 +3589,7 @@ export async function handleInteraction(interaction) {
         const botId = interaction.customId.replace('cfg_chan_appreview_', '');
         const val = interaction.values?.[0] || '';
         updateBotCustomization(botId, 'reviewChannelId', val);
-        const payload = buildConfigPanelPayload(botId, 5, false, interaction.guild);
+        const payload = buildConfigPanelPayload(botId, 4, false, interaction.guild);
         return interaction.update(payload).catch(async () => interaction.editReply(payload).catch(() => null));
       }
 
@@ -3597,7 +3597,7 @@ export async function handleInteraction(interaction) {
         const botId = interaction.customId.replace('cfg_chan_appresults_', '');
         const val = interaction.values?.[0] || '';
         updateBotCustomization(botId, 'resultsChannelId', val);
-        const payload = buildConfigPanelPayload(botId, 5, false, interaction.guild);
+        const payload = buildConfigPanelPayload(botId, 4, false, interaction.guild);
         return interaction.update(payload).catch(async () => interaction.editReply(payload).catch(() => null));
       }
 
@@ -3605,7 +3605,7 @@ export async function handleInteraction(interaction) {
         const botId = interaction.customId.replace('cfg_chan_staffdocs_', '');
         const val = interaction.values?.[0] || '';
         updateBotCustomization(botId, 'staffDocsChannelId', val);
-        const payload = buildConfigPanelPayload(botId, 6, false, interaction.guild);
+        const payload = buildConfigPanelPayload(botId, 5, false, interaction.guild);
         return interaction.update(payload).catch(async () => interaction.editReply(payload).catch(() => null));
       }
 
@@ -3613,7 +3613,7 @@ export async function handleInteraction(interaction) {
         const botId = interaction.customId.replace('cfg_chan_infractions_', '');
         const val = interaction.values?.[0] || '';
         updateBotCustomization(botId, 'infractionsChannelId', val);
-        const payload = buildConfigPanelPayload(botId, 7, false, interaction.guild);
+        const payload = buildConfigPanelPayload(botId, 6, false, interaction.guild);
         return interaction.update(payload).catch(async () => interaction.editReply(payload).catch(() => null));
       }
 
@@ -3621,7 +3621,7 @@ export async function handleInteraction(interaction) {
         const botId = interaction.customId.replace('cfg_chan_promotions_', '');
         const val = interaction.values?.[0] || '';
         updateBotCustomization(botId, 'promotionsChannelId', val);
-        const payload = buildConfigPanelPayload(botId, 7, false, interaction.guild);
+        const payload = buildConfigPanelPayload(botId, 6, false, interaction.guild);
         return interaction.update(payload).catch(async () => interaction.editReply(payload).catch(() => null));
       }
 
@@ -3629,7 +3629,7 @@ export async function handleInteraction(interaction) {
         const botId = interaction.customId.replace('cfg_role_supervisor_', '');
         const val = interaction.values?.[0] || '';
         updateBotCustomization(botId, 'infractionStaffRoleId', val);
-        const payload = buildConfigPanelPayload(botId, 7, false, interaction.guild);
+        const payload = buildConfigPanelPayload(botId, 6, false, interaction.guild);
         return interaction.update(payload).catch(async () => interaction.editReply(payload).catch(() => null));
       }
 
@@ -3991,7 +3991,7 @@ export async function handleInteraction(interaction) {
         const quotaChannelId = getModalVal('quotaChannelId');
         if (quotaRequirement) updateBotCustomization(botId, 'quotaRequirement', quotaRequirement);
         if (quotaChannelId) updateBotCustomization(botId, 'quotaChannelId', quotaChannelId);
-        const payload = buildConfigPanelPayload(botId, 7, false, interaction.guild);
+        const payload = buildConfigPanelPayload(botId, 6, false, interaction.guild);
         return interaction.editReply(payload).catch(() => null);
       }
 
@@ -4001,7 +4001,7 @@ export async function handleInteraction(interaction) {
         const botId = interaction.customId.replace('cfg_modal_forums_', '');
         const forumChannelId = getModalVal('forumChannelId');
         if (forumChannelId) updateBotCustomization(botId, 'forumChannelId', forumChannelId);
-        const payload = buildConfigPanelPayload(botId, 7, false, interaction.guild);
+        const payload = buildConfigPanelPayload(botId, 6, false, interaction.guild);
         return interaction.editReply(payload).catch(() => null);
       }
 
@@ -4013,7 +4013,7 @@ export async function handleInteraction(interaction) {
         const dailyQuestionsTime = getModalVal('dailyQuestionsTime');
         if (dailyQuestionsChannelId) updateBotCustomization(botId, 'dailyQuestionsChannelId', dailyQuestionsChannelId);
         if (dailyQuestionsTime) updateBotCustomization(botId, 'dailyQuestionsTime', dailyQuestionsTime);
-        const payload = buildConfigPanelPayload(botId, 7, false, interaction.guild);
+        const payload = buildConfigPanelPayload(botId, 6, false, interaction.guild);
         return interaction.editReply(payload).catch(() => null);
       }
 
@@ -4245,7 +4245,7 @@ export async function handleInteraction(interaction) {
         if (notificationRoleId) updateBotCustomization(botId, 'notificationRoleId', notificationRoleId);
         if (hostRoleId) updateBotCustomization(botId, 'hostRoleId', hostRoleId);
 
-        const payload = buildConfigPanelPayload(botId, 4, false, interaction.guild);
+        const payload = buildConfigPanelPayload(botId, 3, false, interaction.guild);
         return interaction.editReply(payload).catch(() => null);
       }
 
@@ -4263,7 +4263,7 @@ export async function handleInteraction(interaction) {
         updateBotCustomization(botId, 'sessionShutdownBannerUrl', sessionShutdownBannerUrl);
         updateBotCustomization(botId, 'sessionBottomBannerUrl', sessionBottomBannerUrl);
 
-        const payload = buildConfigPanelPayload(botId, 4, false, interaction.guild);
+        const payload = buildConfigPanelPayload(botId, 3, false, interaction.guild);
         return interaction.editReply(payload).catch(() => null);
       }
 
@@ -4281,7 +4281,7 @@ export async function handleInteraction(interaction) {
         if (sessionShutdownTitle) updateBotCustomization(botId, 'sessionShutdownTitle', sessionShutdownTitle);
         if (sessionShutdownDesc) updateBotCustomization(botId, 'sessionShutdownDesc', sessionShutdownDesc);
 
-        const payload = buildConfigPanelPayload(botId, 4, false, interaction.guild);
+        const payload = buildConfigPanelPayload(botId, 3, false, interaction.guild);
         return interaction.editReply(payload).catch(() => null);
       }
 
@@ -4306,7 +4306,7 @@ export async function handleInteraction(interaction) {
         if (infractRemoveRoleId !== undefined) updateBotCustomization(botId, 'infractRemoveRoleId', infractRemoveRoleId);
         if (infractGiveRoleId !== undefined) updateBotCustomization(botId, 'infractGiveRoleId', infractGiveRoleId);
 
-        const payload = buildConfigPanelPayload(botId, 7, false, interaction.guild);
+        const payload = buildConfigPanelPayload(botId, 6, false, interaction.guild);
         return interaction.editReply(payload).catch(() => null);
       }
 
@@ -4329,7 +4329,7 @@ export async function handleInteraction(interaction) {
         if (promotionBottomBannerUrl !== undefined) updateBotCustomization(botId, 'promotionBottomBannerUrl', promotionBottomBannerUrl);
         if (promotionGiveRoleId !== undefined) updateBotCustomization(botId, 'promotionGiveRoleId', promotionGiveRoleId);
 
-        const payload = buildConfigPanelPayload(botId, 7, false, interaction.guild);
+        const payload = buildConfigPanelPayload(botId, 6, false, interaction.guild);
         return interaction.editReply(payload).catch(() => null);
       }
 
@@ -4347,7 +4347,7 @@ export async function handleInteraction(interaction) {
         if (appTitle) updateBotCustomization(botId, 'appTitle', appTitle);
         if (appDescription) updateBotCustomization(botId, 'appDescription', appDescription);
 
-        const payload = buildConfigPanelPayload(botId, 5, false, interaction.guild);
+        const payload = buildConfigPanelPayload(botId, 4, false, interaction.guild);
         return interaction.editReply(payload).catch(() => null);
       }
 
@@ -4358,7 +4358,7 @@ export async function handleInteraction(interaction) {
         const ingameQuestions = getModalVal('ingameQuestions') || getModalVal('appQuizIntroText');
         if (ingameQuestions) updateBotCustomization(botId, 'ingameQuestions', ingameQuestions);
 
-        const payload = buildConfigPanelPayload(botId, 5, false, interaction.guild);
+        const payload = buildConfigPanelPayload(botId, 4, false, interaction.guild);
         return interaction.editReply(payload).catch(() => null);
       }
 
@@ -4369,7 +4369,7 @@ export async function handleInteraction(interaction) {
         const discordQuestions = getModalVal('discordQuestions');
         if (discordQuestions) updateBotCustomization(botId, 'discordQuestions', discordQuestions);
 
-        const payload = buildConfigPanelPayload(botId, 5, false, interaction.guild);
+        const payload = buildConfigPanelPayload(botId, 4, false, interaction.guild);
         return interaction.editReply(payload).catch(() => null);
       }
 
@@ -4385,7 +4385,7 @@ export async function handleInteraction(interaction) {
         if (staffDocsDescription) updateBotCustomization(botId, 'staffDocsDescription', staffDocsDescription);
         if (staffDocsLayout) updateBotCustomization(botId, 'staffDocsLayout', staffDocsLayout);
 
-        const payload = buildConfigPanelPayload(botId, 6, false, interaction.guild);
+        const payload = buildConfigPanelPayload(botId, 5, false, interaction.guild);
         return interaction.editReply(payload).catch(() => null);
       }
 
@@ -4399,7 +4399,7 @@ export async function handleInteraction(interaction) {
         updateBotCustomization(botId, 'staffDocsTopBannerUrl', staffDocsTopBannerUrl);
         updateBotCustomization(botId, 'staffDocsBottomBannerUrl', staffDocsBottomBannerUrl);
 
-        const payload = buildConfigPanelPayload(botId, 6, false, interaction.guild);
+        const payload = buildConfigPanelPayload(botId, 5, false, interaction.guild);
         return interaction.editReply(payload).catch(() => null);
       }
 
@@ -4411,7 +4411,7 @@ export async function handleInteraction(interaction) {
 
         updateBotCustomization(botId, 'botStaffRoleId', botStaffRoleId);
 
-        const payload = buildConfigPanelPayload(botId, 7, false, interaction.guild);
+        const payload = buildConfigPanelPayload(botId, 6, false, interaction.guild);
         return interaction.editReply(payload).catch(() => null);
       }
 
@@ -4427,7 +4427,7 @@ export async function handleInteraction(interaction) {
         if (appBottomBannerUrl) updateBotCustomization(botId, 'appBottomBannerUrl', appBottomBannerUrl);
         if (appQuizIntroText) updateBotCustomization(botId, 'appQuizIntroText', appQuizIntroText);
 
-        const payload = buildConfigPanelPayload(botId, 5, false, interaction.guild);
+        const payload = buildConfigPanelPayload(botId, 4, false, interaction.guild);
         return interaction.editReply(payload).catch(() => null);
       }
 
@@ -4447,7 +4447,7 @@ export async function handleInteraction(interaction) {
         if (regulationsBannerUrl) updateBotCustomization(botId, 'regulationsBannerUrl', regulationsBannerUrl);
         if (staffDocsChannelId) updateBotCustomization(botId, 'staffDocsChannelId', staffDocsChannelId);
 
-        const payload = buildConfigPanelPayload(botId, 6, false, interaction.guild);
+        const payload = buildConfigPanelPayload(botId, 5, false, interaction.guild);
         return interaction.editReply(payload).catch(() => null);
       }
 
@@ -4464,7 +4464,7 @@ export async function handleInteraction(interaction) {
         if (welcomeText) updateBotCustomization(botId, 'welcomeText', welcomeText);
         updateBotCustomization(botId, 'welcomeEnabled', Boolean(welcomeChannelId && welcomeChannelId.trim().length > 0));
 
-        const payload = buildConfigPanelPayload(botId, 7, false, interaction.guild);
+        const payload = buildConfigPanelPayload(botId, 6, false, interaction.guild);
         return interaction.editReply(payload).catch(() => null);
       }
 
@@ -4483,7 +4483,7 @@ export async function handleInteraction(interaction) {
         updateBotCustomization(botId, 'aiProvider', aiProvider || 'openrouter');
         updateBotCustomization(botId, 'aiApiKey', aiApiKey);
 
-        const payload = buildConfigPanelPayload(botId, 8, false, interaction.guild);
+        const payload = buildConfigPanelPayload(botId, 7, false, interaction.guild);
         return interaction.editReply(payload).catch(err => {
           console.error('[CONFIG MODAL AI KEY ERROR]:', err);
         });

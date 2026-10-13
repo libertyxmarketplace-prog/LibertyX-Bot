@@ -66,7 +66,10 @@ function createCustomerClient(bot, intents) {
       });
 
       try {
-        const actName = (bot.customizations?.botActivityText && bot.customizations.botActivityText.trim()) || 'ER:LC';
+        const defaultPromo = bot.customizations?.serverName
+          ? `${bot.customizations.serverName} | Code: ${bot.customizations.joinCode || 'Join'}`
+          : 'Orlando Roleplay | Join Now';
+        const actName = (bot.customizations?.botActivityText && bot.customizations.botActivityText.trim()) || defaultPromo;
         customerClient.user.setPresence({
           activities: [{ name: actName, type: ActivityType.Watching }],
           status: 'online'

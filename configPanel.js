@@ -43,14 +43,13 @@ export const EMOJIS = {
 export const DEFAULT_BOTTOM_BANNER = null;
 
 export const PAGE_META = [
-  { id: 1, tab: 'Permissions', title: 'PERMISSIONS & ACCESS' },
-  { id: 2, tab: 'Tickets', title: 'TICKET CATEGORIES' },
-  { id: 3, tab: 'Appearance', title: 'TICKET APPEARANCE' },
-  { id: 4, tab: 'Sessions', title: 'LIVE SESSIONS' },
-  { id: 5, tab: 'Applications', title: 'STAFF APPLICATIONS' },
-  { id: 6, tab: 'Docs', title: 'STAFF DOCUMENTATION' },
-  { id: 7, tab: 'Community', title: 'COMMUNITY & TRACKING' },
-  { id: 8, tab: 'AI', title: 'MAVELY AI ASSISTANT' }
+  { id: 1, tab: 'Credentials', title: 'CREDENTIALS & SETUP' },
+  { id: 2, tab: 'Tickets', title: 'TICKET CATEGORIES & APPEARANCE' },
+  { id: 3, tab: 'Sessions', title: 'LIVE SESSIONS' },
+  { id: 4, tab: 'Applications', title: 'STAFF APPLICATIONS' },
+  { id: 5, tab: 'Docs', title: 'STAFF DOCUMENTATION' },
+  { id: 6, tab: 'Community', title: 'COMMUNITY & TRACKING' },
+  { id: 7, tab: 'AI', title: 'MAVELY AI ASSISTANT' }
 ];
 
 function maskSecret(str) {
@@ -126,7 +125,7 @@ function buildModulesDropdown(botId) {
       .setCustomId(`cfg_menu_modules_${botId}`)
       .setPlaceholder('Jump to Module')
       .addOptions([
-        { label: 'Permissions & Access', value: 'nav_page_1', description: 'Staff and administrator permissions' },
+        { label: 'Credentials & Setup', value: 'nav_page_1', description: 'Bot credentials and permissions' },
         { label: 'Ticket System & Appearance', value: 'nav_page_2', description: 'Categories, routing, and panel styling' },
         { label: 'Live Sessions', value: 'nav_page_3', description: 'ER:LC patrol announcements and radios' },
         { label: 'Staff Applications', value: 'nav_page_4', description: 'Recruitment intake and review channels' },
@@ -214,9 +213,14 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = fal
 
   switch (activePage) {
     // ══════════════════════════════════════════════════════════════════════
-    // PAGE 1: PERMISSIONS & ACCESS
+    // PAGE 1: CREDENTIALS & SETUP
     // ══════════════════════════════════════════════════════════════════════
     case 1: {
+      const hasToken = Boolean(bot?.token && bot.token.trim().length > 0);
+      const hasApiKey = Boolean(bot?.erlcApiKey && bot.erlcApiKey.trim().length > 0);
+      const tokenMark = hasToken ? EMOJIS.CHECK : EMOJIS.CROSS;
+      const apiKeyMark = hasApiKey ? EMOJIS.CHECK : EMOJIS.CROSS;
+
       const staffMark = cust.botStaffRoleId ? EMOJIS.CHECK : EMOJIS.CROSS;
       const staffDisplay = cust.botStaffRoleId ? `<@&${cust.botStaffRoleId}>` : 'Not Configured';
       const adminRole = cust.adminRoleId || (Array.isArray(cust.staffRoleIds) && cust.staffRoleIds[0]) || '';
@@ -227,38 +231,43 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = fal
       const actText = cust.botActivityText?.trim() || defaultPromo;
 
       embed.setDescription(
-        '> Manage server access and authority levels for your community. Select roles below to grant permissions.\n\n' +
+        '> Connect your Discord bot token and ER:LC server key to activate your instance, and manage community access.\n\n' +
+        '**Credentials**\n' +
+        `${tokenMark} Bot Token: ${hasToken ? 'Connected' : 'Not Configured'}\n` +
+        `${apiKeyMark} ER:LC API Key: ${hasApiKey ? 'Connected' : 'Not Configured'}\n\n` +
         '**Permissions**\n' +
         `${staffMark} Staff Role: ${staffDisplay}\n` +
         `${adminMark} Admin Role: ${adminDisplay}\n\n` +
-        '**Bot Presence**\n' +
-        `Activity: Watching ${actText}\n\n` +
-        '**Assistant**\n' +
-        'Need help? Click the **Helper** button below for guidance.'
+        '**In-Game Server**\n' +
+        `╭ Community Name: ${cust.serverName?.trim() || 'Orlando Roleplay'}\n` +
+        `├ Join Code: ${cust.joinCode?.trim() || 'ORLERLC'}\n` +
+        `╰ Presence: Watching ${actText}`
       );
 
-      // Row 1: Staff Role (Select from Discord roles directly)
+      // Row 1: Credentials (Green) & Server Details (Gray) Buttons
+      rows.push(new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`cfg_btn_initial_setup_${botId}`)
+          .setLabel('Setup Credentials')
+          .setStyle(ButtonStyle.Success),
+        new ButtonBuilder()
+          .setCustomId(`cfg_btn_servercore_${botId}`)
+          .setLabel('Server Details')
+          .setStyle(ButtonStyle.Secondary)
+      ));
+
+      // Row 2: Staff Role (Select from Discord roles directly)
       rows.push(new ActionRowBuilder().addComponents(
         new RoleSelectMenuBuilder()
           .setCustomId(`cfg_role_staff_${botId}`)
           .setPlaceholder('Select Staff Role')
       ));
 
-      // Row 2: Admin Role (Select from Discord roles directly)
+      // Row 3: Admin Role (Select from Discord roles directly)
       rows.push(new ActionRowBuilder().addComponents(
         new RoleSelectMenuBuilder()
           .setCustomId(`cfg_role_admin_${botId}`)
           .setPlaceholder('Select Admin Role')
-      ));
-
-      // Row 3: Settings Dropdown (Bot Activity text, Join Code)
-      rows.push(new ActionRowBuilder().addComponents(
-        new StringSelectMenuBuilder()
-          .setCustomId(`cfg_index_${botId}_1`)
-          .setPlaceholder('Bot Presence & Server Info')
-          .addOptions([
-            { label: 'Bot Activity & Server Identity', value: 'edit_server_core', description: 'Customize status text (replaces ER:LC) and join code' }
-          ])
       ));
 
       // Row 4: Modules Dropdown

@@ -2112,9 +2112,7 @@ export async function handleInteraction(interaction) {
         const hasApiKey = Boolean(targetBot.erlcApiKey && targetBot.erlcApiKey.trim().length > 0);
         const isSetupComplete = targetBot.setupCompleted && hasToken && hasApiKey;
 
-        const payload = isSetupComplete
-          ? buildConfigPanelPayload(targetBot.botId, requestedPage, false, interaction.guild)
-          : buildInitialSetupPayload(targetBot.botId, targetBot);
+        const payload = buildConfigPanelPayload(targetBot.botId, requestedPage, false, interaction.guild);
 
         return sendConfigResponse(payload).catch(err => {
           if (err.code !== 40060 && err.code !== 10062) {
@@ -3983,9 +3981,7 @@ export async function handleInteraction(interaction) {
         const currentBot = getBotInstance(botId);
         const hasToken = Boolean(currentBot?.token && currentBot.token.trim().length > 0);
         const hasApiKey = Boolean(currentBot?.erlcApiKey && currentBot.erlcApiKey.trim().length > 0);
-        const payload = (hasToken && hasApiKey)
-          ? buildConfigPanelPayload(botId, 1, false, interaction.guild)
-          : buildInitialSetupPayload(botId, currentBot);
+        const payload = buildConfigPanelPayload(botId, 1, false, interaction.guild);
         return interaction.editReply(payload).catch(() => null);
       }
 

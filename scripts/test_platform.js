@@ -71,13 +71,14 @@ const retriggerSuccess = retriggerBot(newBot.botId);
 assert.strictEqual(retriggerSuccess.success, true, "Retrigger should succeed once unbanned");
 console.log(`[PASS] Retrigger bot verified`);
 
-// 6. Test Config Panel Payloads for Pages 1 through 6
+// 6. Test Config Panel Payloads for Pages 1 through TOTAL_PAGES
 for (let p = 1; p <= TOTAL_PAGES; p++) {
   const payload = buildConfigPanelPayload(newBot.botId, p);
-  assert.strictEqual(payload.flags, 32768, `Page ${p} must have Components V2 flag 32768`);
-  assert.strictEqual(payload.components?.[0]?.type, 17, `Page ${p} must have V2 Container type 17`);
+  assert.strictEqual(payload.flags, 64, `Page ${p} must have ephemeral flag 64`);
+  assert(payload.embeds?.length > 0, `Page ${p} must have embeds`);
+  assert(payload.components?.length > 0, `Page ${p} must have components`);
 }
-console.log(`[PASS] Config panel pages 1 through ${TOTAL_PAGES} generated cleanly in V2 Container format`);
+console.log(`[PASS] Config panel pages 1 through ${TOTAL_PAGES} generated cleanly in embed format`);
 
 // 7. Test Modals
 const credsModal = buildCredentialsModal(newBot.botId);

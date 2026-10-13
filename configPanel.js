@@ -186,18 +186,14 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
   const cust = bot.customizations || {};
   const activePage = Math.max(1, Math.min(TOTAL_PAGES, page));
   const rows = [];
-  const files = [];
-
-  if (fs.existsSync(MAVELY_LOGO_PATH)) {
-    files.push(new AttachmentBuilder(MAVELY_LOGO_PATH, { name: 'mavely_logo.png' }));
-  }
-
-  const bigBanner = cust.topBannerUrl || CONFIG.SESSION.VOTE_TOP_BANNER_URL || 'https://i.imgur.com/8QzX9nB.png';
 
   const embed = new EmbedBuilder()
     .setColor(0x2b2d31)
-    .setImage(bigBanner)
     .setFooter({ text: `Page ${activePage} of ${TOTAL_PAGES}` });
+
+  if (cust.topBannerUrl && typeof cust.topBannerUrl === 'string' && cust.topBannerUrl.startsWith('http') && !cust.topBannerUrl.includes('imgur.com/8QzX9nB')) {
+    embed.setImage(cust.topBannerUrl.trim());
+  }
 
   switch (activePage) {
     // ══════════════════════════════════════════════════════════════════════
@@ -210,11 +206,15 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
       const adminMark = adminRole ? EMOJIS.CHECK : EMOJIS.CROSS;
       const adminDisplay = adminRole ? `<@&${adminRole}>` : 'Not Configured';
 
+      const actText = cust.botActivityText?.trim() || 'ER:LC';
+
       embed.setDescription(
         '> Manage server access and authority levels for your community. Select roles below to grant permissions.\n\n' +
         '**Permissions**\n' +
         `${staffMark} Staff Role: ${staffDisplay}\n` +
-        `${adminMark} Admin Role: ${adminDisplay}`
+        `${adminMark} Admin Role: ${adminDisplay}\n\n` +
+        '**Bot Presence**\n' +
+        `Activity: Watching ${actText}`
       );
 
       // Row 1: Staff Role (Select from Discord roles directly)
@@ -231,10 +231,20 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
           .setPlaceholder('Select Admin Role')
       ));
 
-      // Row 3: Modules Dropdown
+      // Row 3: Settings Dropdown (Bot Activity text, Join Code)
+      rows.push(new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId(`cfg_index_${botId}_1`)
+          .setPlaceholder('Bot Presence & Server Info')
+          .addOptions([
+            { label: 'Bot Activity & Server Identity', value: 'edit_server_core', description: 'Customize status text (replaces ER:LC) and join code' }
+          ])
+      ));
+
+      // Row 4: Modules Dropdown
       rows.push(buildModulesDropdown(botId));
 
-      // Row 4: Navigation Button Row
+      // Row 5: Navigation Button Row
       rows.push(buildNavButtonRow(botId, 1));
       break;
     }
@@ -552,17 +562,11 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
     }
   }
 
-  const payload = {
+  return {
     embeds: [embed],
     components: rows,
     flags: 64
   };
-
-  if (files.length > 0) {
-    payload.files = files;
-  }
-
-  return payload;
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -629,9 +633,18 @@ export function buildServerCoreModal(botId) {
     .setRequired(false);
   if (cust.joinCode?.trim()) joinInput.setValue(cust.joinCode.trim());
 
+  const activityInput = new TextInputBuilder()
+    .setCustomId('botActivityText')
+    .setLabel('Bot Status Activity (replaces ER:LC)')
+    .setStyle(TextInputStyle.Short)
+    .setPlaceholder('e.g. Liberty County (Default: ER:LC)')
+    .setRequired(false);
+  if (cust.botActivityText?.trim()) activityInput.setValue(cust.botActivityText.trim());
+
   modal.addComponents(
     new ActionRowBuilder().addComponents(nameInput),
-    new ActionRowBuilder().addComponents(joinInput)
+    new ActionRowBuilder().addComponents(joinInput),
+    new ActionRowBuilder().addComponents(activityInput)
   );
 
   return modal;

@@ -134,7 +134,10 @@ export const DEFAULT_CUSTOMIZATIONS = {
   aiProvider: "openrouter",
   aiModel: "openai/gpt-4o-mini",
   aiApiKey: "",
-  aiSystemInstructions: ""
+  aiSystemInstructions: "",
+
+  // ─── Bot Presence ──────────────────────────────────────────────────────────
+  botActivityText: "" // Custom activity status text (replaces default 'ER:LC')
 };
 
 

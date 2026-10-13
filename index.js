@@ -4089,9 +4089,22 @@ export async function handleInteraction(interaction) {
         const botId = interaction.customId.replace('cfg_modal_servercore_', '');
         const serverName = getModalVal('serverName');
         const joinCode = getModalVal('joinCode');
+        const botActivityText = getModalVal('botActivityText');
 
         updateBotCustomization(botId, 'serverName', serverName);
         updateBotCustomization(botId, 'joinCode', joinCode);
+        if (botActivityText !== undefined) {
+          updateBotCustomization(botId, 'botActivityText', botActivityText);
+          const custClient = activeCustomerClients.get(botId);
+          if (custClient?.user) {
+            try {
+              custClient.user.setPresence({
+                activities: [{ name: botActivityText.trim() || 'ER:LC', type: ActivityType.Watching }],
+                status: 'online'
+              });
+            } catch {}
+          }
+        }
 
         const payload = buildConfigPanelPayload(botId, 1, false);
         return interaction.editReply(payload).catch(() => null);

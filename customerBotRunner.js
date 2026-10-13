@@ -66,8 +66,9 @@ function createCustomerClient(bot, intents) {
       });
 
       try {
+        const actName = (bot.customizations?.botActivityText && bot.customizations.botActivityText.trim()) || 'ER:LC';
         customerClient.user.setPresence({
-          activities: [{ name: 'ER:LC', type: ActivityType.Watching }],
+          activities: [{ name: actName, type: ActivityType.Watching }],
           status: 'online'
         });
       } catch {}

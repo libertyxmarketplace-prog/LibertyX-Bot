@@ -74,76 +74,27 @@ function roleRef(id) {
  * Build Initial Setup Gate payload (shown before config when credentials are missing)
  */
 export function buildInitialSetupPayload(botId, bot) {
-  const isOnline = bot?.status === 'active' && Boolean(bot?.token && bot.token.trim().length > 0);
-  const isInvalid = bot?.status === 'invalid_token';
   const hasToken = Boolean(bot?.token && bot.token.trim().length > 0);
   const hasApiKey = Boolean(bot?.erlcApiKey && bot.erlcApiKey.trim().length > 0);
-  const hasCredentials = hasToken && hasApiKey;
-
-  let tokenStatusText = 'Not Configured';
-  let tokenMark = EMOJIS.CROSS;
-  if (isOnline) {
-    tokenStatusText = 'Connected';
-    tokenMark = EMOJIS.CHECK;
-  } else if (hasToken) {
-    tokenStatusText = isInvalid ? 'Offline (Verification Failed)' : 'Connecting...';
-    tokenMark = EMOJIS.CROSS;
-  }
-
-  const descLines = [
-    '> Connect your Discord bot token and ER:LC server key to activate your instance.'
-  ];
-
-  if (isInvalid) {
-    descLines.push('', '> **Notice**: Discord could not verify this bot token. You can update your token anytime using the button below.');
-  }
-
-  descLines.push(
-    '',
-    '**Credentials**',
-    `${tokenMark} Bot Token: ${tokenStatusText}`,
-    `${hasApiKey ? EMOJIS.CHECK : EMOJIS.CROSS} ER:LC API Key: ${hasApiKey ? 'Connected' : 'Not Configured'}`
-  );
 
   const embed = new EmbedBuilder()
     .setColor(0x2b2d31)
     .setTitle('Initial Setup')
-    .setDescription(descLines.join('\n'))
+    .setDescription(
+      '> Connect your Discord bot token and ER:LC server key to activate your instance.\n\n' +
+      '**Credentials**\n' +
+      `${hasToken ? EMOJIS.CHECK : EMOJIS.CROSS} Bot Token: ${hasToken ? 'Connected' : 'Not Configured'}\n` +
+      `${hasApiKey ? EMOJIS.CHECK : EMOJIS.CROSS} ER:LC API Key: ${hasApiKey ? 'Connected' : 'Not Configured'}`
+    )
     .setThumbnail('https://cdn.discordapp.com/avatars/1552165138017165372/9c397e6df530a28a6208310c9c3491a2.png?size=256')
     .setFooter({ text: 'Initial Setup' });
-
-  let derivedClientId = bot?.discordBotId;
-  if (!derivedClientId && bot?.token) {
-    try {
-      const raw = Buffer.from(bot.token.split('.')[0], 'base64').toString('utf-8');
-      if (/^\d{17,20}$/.test(raw)) derivedClientId = raw;
-    } catch {}
-  }
 
   const buttons = [
     new ButtonBuilder()
       .setCustomId(`cfg_btn_initial_setup_${botId}`)
-      .setLabel(hasToken ? 'Update Credentials' : 'Setup Credentials')
+      .setLabel('Setup Credentials')
       .setStyle(ButtonStyle.Success)
   ];
-
-  if (derivedClientId) {
-    buttons.push(
-      new ButtonBuilder()
-        .setLabel('Invite Bot')
-        .setStyle(ButtonStyle.Link)
-        .setURL(`https://discord.com/oauth2/authorize?client_id=${derivedClientId}&permissions=8&scope=bot%20applications.commands`)
-    );
-  }
-
-  if (hasCredentials || isOnline) {
-    buttons.push(
-      new ButtonBuilder()
-        .setCustomId(`cfg_btn_skip_setup_${botId}`)
-        .setLabel('Open Config Panel')
-        .setStyle(ButtonStyle.Secondary)
-    );
-  }
 
   const row = new ActionRowBuilder().addComponents(buttons);
 
@@ -262,7 +213,7 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = fal
 
       const tokenMark = isOnline ? EMOJIS.CHECK : EMOJIS.CROSS;
       const hasToken = Boolean(bot?.token && bot.token.trim().length > 0);
-      const tokenText = isOnline ? 'Connected' : (hasToken ? (isInvalid ? 'Offline (Verification Failed)' : 'Connecting...') : 'Not Configured');
+      const tokenText = hasToken ? 'Connected' : 'Not Configured';
       const apiKeyMark = hasApiKey ? EMOJIS.CHECK : EMOJIS.CROSS;
 
       const staffMark = cust.botStaffRoleId ? EMOJIS.CHECK : EMOJIS.CROSS;
@@ -288,36 +239,17 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = fal
         `╰ Presence: Watching ${actText}`
       );
 
-      // Row 1: Credentials & Server Details & Invite
-      const r1Buttons = [
+      // Row 1: Credentials (Green) & Server Details (Gray) Buttons
+      rows.push(new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId(`cfg_btn_initial_setup_${botId}`)
-          .setLabel(isOnline ? 'Update Credentials' : 'Setup Credentials')
-          .setStyle(isOnline ? ButtonStyle.Success : ButtonStyle.Danger),
+          .setLabel('Setup Credentials')
+          .setStyle(ButtonStyle.Success),
         new ButtonBuilder()
           .setCustomId(`cfg_btn_servercore_${botId}`)
           .setLabel('Server Details')
           .setStyle(ButtonStyle.Secondary)
-      ];
-
-      let derivedClientId = bot?.discordBotId;
-      if (!derivedClientId && bot?.token) {
-        try {
-          const raw = Buffer.from(bot.token.split('.')[0], 'base64').toString('utf-8');
-          if (/^\d{17,20}$/.test(raw)) derivedClientId = raw;
-        } catch {}
-      }
-
-      if (derivedClientId) {
-        r1Buttons.push(
-          new ButtonBuilder()
-            .setLabel('Invite Bot')
-            .setStyle(ButtonStyle.Link)
-            .setURL(`https://discord.com/oauth2/authorize?client_id=${derivedClientId}&permissions=8&scope=bot%20applications.commands`)
-        );
-      }
-
-      rows.push(new ActionRowBuilder().addComponents(r1Buttons));
+      ));
 
       // Row 2: Staff Role (Select from Discord roles directly)
       rows.push(new ActionRowBuilder().addComponents(

@@ -2108,9 +2108,9 @@ export async function handleInteraction(interaction) {
           }).catch(() => null);
         }
 
-        const isOnline = targetBot.status === 'active' && Boolean(targetBot.token && targetBot.token.trim().length > 0);
+        const hasToken = Boolean(targetBot.token && targetBot.token.trim().length > 0);
         const hasApiKey = Boolean(targetBot.erlcApiKey && targetBot.erlcApiKey.trim().length > 0);
-        const isSetupComplete = targetBot.setupCompleted || (hasToken && hasApiKey) || (isOnline && hasApiKey);
+        const isSetupComplete = Boolean(targetBot.setupCompleted || (hasToken && hasApiKey));
 
         const payload = isSetupComplete
           ? buildConfigPanelPayload(targetBot.botId, requestedPage, false, interaction.guild)
@@ -3981,7 +3981,7 @@ export async function handleInteraction(interaction) {
         }
 
         const currentBot = getBotInstance(botId);
-        const isOnline = currentBot?.status === 'active';
+        const hasToken = Boolean(currentBot?.token && currentBot.token.trim().length > 0);
         const hasApiKey = Boolean(currentBot?.erlcApiKey && currentBot.erlcApiKey.trim().length > 0);
         const payload = (hasToken && hasApiKey)
           ? buildConfigPanelPayload(botId, 1, false, interaction.guild)

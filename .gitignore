@@ -17,3 +17,7 @@ data/backups/
 data/*.tmp
 data/tickets.json
 
+# AI Agent folders
+.gemini/
+.claude/
+CLAUDE.local.md

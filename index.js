@@ -1957,7 +1957,7 @@ function resolveConfigPanelPage(interaction, fallbackPage = 1) {
  */
 function buildConfigActionModal(botId, action) {
   switch (action) {
-    case 'edit_credentials': return buildCredentialsModal(botId);
+    case 'edit_credentials': return buildInitialSetupModal(botId);
     case 'edit_server_core':
     case 'edit_servercore': return buildServerCoreModal(botId);
     case 'edit_ticket_catnames': return buildTicketCategoryNamesModal(botId);

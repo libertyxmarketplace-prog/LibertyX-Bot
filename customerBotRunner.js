@@ -49,10 +49,12 @@ export function setMessageHandler(handler) {
 
 function createCustomerClient(bot, intents) {
   const botId = bot.botId;
-  const defaultPromo = bot.customizations?.serverName
-    ? `${bot.customizations.serverName} | Code: ${bot.customizations.joinCode || 'Join'}`
-    : 'Orlando Roleplay | Join Now';
-  const actName = (bot.customizations?.botActivityText && bot.customizations.botActivityText.trim()) || defaultPromo;
+  const freshBot = getBotInstance(bot.botId) || bot;
+  const freshCust = freshBot.customizations || {};
+  const defaultPromo = freshCust.serverName
+    ? `${freshCust.serverName} | Code: ${freshCust.joinCode || 'Join'}`
+    : 'Our Community';
+  const actName = (freshCust.botActivityText && freshCust.botActivityText.trim()) || defaultPromo;
 
   const customerClient = new Client({
     intents,
@@ -75,10 +77,12 @@ function createCustomerClient(bot, intents) {
       });
 
       try {
-        const defaultPromo = bot.customizations?.serverName
-          ? `${bot.customizations.serverName} | Code: ${bot.customizations.joinCode || 'Join'}`
-          : 'Orlando Roleplay | Join Now';
-        const actName = (bot.customizations?.botActivityText && bot.customizations.botActivityText.trim()) || defaultPromo;
+        const freshBot = getBotInstance(bot.botId) || bot;
+        const freshCust = freshBot.customizations || {};
+        const defaultPromo = freshCust.serverName
+          ? `${freshCust.serverName} | Code: ${freshCust.joinCode || 'Join'}`
+          : 'Our Community';
+        const actName = (freshCust.botActivityText && freshCust.botActivityText.trim()) || defaultPromo;
         customerClient.user.setPresence({
           activities: [{ name: actName, type: ActivityType.Watching }],
           status: 'online'

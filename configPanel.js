@@ -115,7 +115,8 @@ function buildModulesDropdown(botId) {
       .setCustomId(`cfg_menu_modules_${botId}`)
       .setPlaceholder('Jump to Module')
       .addOptions([
-        { label: 'Credentials & Setup', value: 'nav_page_1', description: 'Bot credentials and permissions' },
+        { label: 'Credentials & Setup', value: 'edit_credentials', description: 'Configure bot token and ER:LC API key' },
+        { label: 'Server Details', value: 'edit_servercore', description: 'Server name, join code, and custom presence' },
         { label: 'Ticket System & Appearance', value: 'nav_page_2', description: 'Categories, routing, and panel styling' },
         { label: 'Live Sessions', value: 'nav_page_3', description: 'ER:LC patrol announcements and radios' },
         { label: 'Staff Applications', value: 'nav_page_4', description: 'Recruitment intake and review channels' },
@@ -222,7 +223,7 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = fal
       const adminMark = adminRole ? EMOJIS.CHECK : EMOJIS.CROSS;
       const adminDisplay = adminRole ? `<@&${adminRole}>` : 'Not Configured';
 
-      const defaultPromo = cust.serverName ? `${cust.serverName} | Code: ${cust.joinCode || 'Join'}` : 'Orlando Roleplay | Join Now';
+      const defaultPromo = cust.serverName ? `${cust.serverName} | Code: ${cust.joinCode || 'Join'}` : 'Our Community';
       const actText = cust.botActivityText?.trim() || defaultPromo;
 
       embed.setDescription(
@@ -234,41 +235,29 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = fal
         `${staffMark} Staff Role: ${staffDisplay}\n` +
         `${adminMark} Admin Role: ${adminDisplay}\n\n` +
         '**In-Game Server**\n' +
-        `╭ Community Name: ${cust.serverName?.trim() || 'Orlando Roleplay'}\n` +
-        `├ Join Code: ${cust.joinCode?.trim() || 'ORLERLC'}\n` +
+        `╭ Community Name: ${cust.serverName?.trim() || 'Not Configured'}\n` +
+        `├ Join Code: ${cust.joinCode?.trim() || 'Not Configured'}\n` +
         `╰ Presence: Watching ${actText}`
       );
 
-      // Row 1: Credentials (Green) & Server Details (Gray) Buttons
-      rows.push(new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId(`cfg_btn_initial_setup_${botId}`)
-          .setLabel('Setup Credentials')
-          .setStyle(ButtonStyle.Success),
-        new ButtonBuilder()
-          .setCustomId(`cfg_btn_servercore_${botId}`)
-          .setLabel('Server Details')
-          .setStyle(ButtonStyle.Secondary)
-      ));
-
-      // Row 2: Staff Role (Select from Discord roles directly)
+      // Row 1: Staff Role (Select from Discord roles directly)
       rows.push(new ActionRowBuilder().addComponents(
         new RoleSelectMenuBuilder()
           .setCustomId(`cfg_role_staff_${botId}`)
           .setPlaceholder('Select Staff Role')
       ));
 
-      // Row 3: Admin Role (Select from Discord roles directly)
+      // Row 2: Admin Role (Select from Discord roles directly)
       rows.push(new ActionRowBuilder().addComponents(
         new RoleSelectMenuBuilder()
           .setCustomId(`cfg_role_admin_${botId}`)
           .setPlaceholder('Select Admin Role')
       ));
 
-      // Row 4: Modules Dropdown
+      // Row 3: Modules Dropdown
       rows.push(buildModulesDropdown(botId));
 
-      // Row 5: Navigation Button Row
+      // Row 4: Navigation Button Row
       rows.push(buildNavButtonRow(botId, 1));
       break;
     }
@@ -618,32 +607,33 @@ export function buildServerCoreModal(botId) {
     .setCustomId(`cfg_modal_servercore_${botId}`)
     .setTitle('Server Identity & Join Code');
 
-  const autoName = cust.serverName?.trim() || 'Orlando Roleplay I Strict I Liveries';
-  const autoJoin = cust.joinCode?.trim() || 'ORLERLC';
+  const currentName = cust.serverName?.trim() || '';
+  const currentJoin = cust.joinCode?.trim() || '';
+  const currentActivity = cust.botActivityText?.trim() || '';
 
   const nameInput = new TextInputBuilder()
     .setCustomId('serverName')
     .setLabel('In-Game Server Name')
     .setStyle(TextInputStyle.Short)
-    .setPlaceholder('e.g. Orlando Roleplay')
+    .setPlaceholder('e.g. My Community')
     .setRequired(false);
-  nameInput.setValue(autoName);
+  if (currentName) nameInput.setValue(currentName);
 
   const joinInput = new TextInputBuilder()
     .setCustomId('joinCode')
     .setLabel('Server Join Code')
     .setStyle(TextInputStyle.Short)
-    .setPlaceholder('e.g. ORLERLC')
+    .setPlaceholder('e.g. JOINCODE')
     .setRequired(false);
-  joinInput.setValue(autoJoin);
+  if (currentJoin) joinInput.setValue(currentJoin);
 
   const activityInput = new TextInputBuilder()
     .setCustomId('botActivityText')
     .setLabel('Bot Status Activity (Custom Presence)')
     .setStyle(TextInputStyle.Short)
-    .setPlaceholder(`e.g. ${autoName} | Code: ${autoJoin}`)
+    .setPlaceholder('e.g. Patrolling | Code: JOINCODE')
     .setRequired(false);
-  if (cust.botActivityText?.trim()) activityInput.setValue(cust.botActivityText.trim());
+  if (currentActivity) activityInput.setValue(currentActivity);
 
   modal.addComponents(
     new ActionRowBuilder().addComponents(nameInput),

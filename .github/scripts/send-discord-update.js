@@ -26,8 +26,23 @@ async function run() {
   const branch = ref.replace('refs/heads/', '');
 
   const sender = eventData.sender || {};
-  const githubUser = sender.login || 'developer';
-  const senderProfile = sender.html_url || `https://github.com/${githubUser}`;
+  const senderLogin = (sender.login || '').toLowerCase();
+
+  // Map to the 2 Lead Developers: eazykims or George
+  let devDisplayName = 'Lead Developer';
+  if (senderLogin.includes('george') || senderLogin.includes('ford')) {
+    devDisplayName = 'George • Lead Developer';
+  } else if (senderLogin.includes('eazy') || senderLogin.includes('kim') || senderLogin.includes('sulman') || senderLogin.includes('lumora') || senderLogin.includes('liberty')) {
+    devDisplayName = 'eazykims • Lead Developer';
+  } else {
+    // Check first commit author if sender is a generic bot/action
+    const firstCommitAuthor = ((eventData.commits && eventData.commits[0]?.author?.name) || '').toLowerCase();
+    if (firstCommitAuthor.includes('george')) {
+      devDisplayName = 'George • Lead Developer';
+    } else {
+      devDisplayName = 'eazykims • Lead Developer';
+    }
+  }
 
   const commits = Array.isArray(eventData.commits) ? eventData.commits : [];
   if (commits.length === 0) {
@@ -38,14 +53,13 @@ async function run() {
   const commitCount = commits.length;
   const compareUrl = eventData.compare || (commits[0] ? commits[0].url : repoUrl);
 
-  // Format commit lines: NO emojis, NO personal names leaked (only GitHub handle and hash)
+  // Format clean commit list: zero emojis, no leaked real names
   const commitLines = commits.slice(0, 10).map(c => {
     const shortSha = c.id.substring(0, 7);
     const firstLine = (c.message || 'Updated code').split('\n')[0].trim();
     return `- [\`${shortSha}\`](${c.url}) ${firstLine}`;
   }).join('\n');
 
-  // Format clean date
   const now = new Date();
   const dateFormatted = now.toLocaleDateString('en-US', {
     month: 'short',
@@ -60,7 +74,7 @@ async function run() {
   const mavelyLogoUrl = 'https://raw.githubusercontent.com/libertyxmarketplace-prog/Mavelybot/main/assets/mavely_logo.png';
 
   const embed = {
-    color: 0x1fd186, // Sleek Mavely Mint Green (#1FD186)
+    color: 0x1fd186, // Mavely Mint Green (#1FD186)
     author: {
       name: 'Mavely | Development Update',
       icon_url: mavelyLogoUrl
@@ -69,7 +83,7 @@ async function run() {
       url: mavelyLogoUrl
     },
     description: [
-      `**Developer:** [@${githubUser}](${senderProfile})`,
+      `**Developer:** ${devDisplayName}`,
       `**Repository:** [${repoName}](${repoUrl})`,
       `**Branch:** \`${branch}\` (${commitCount} commit${commitCount === 1 ? '' : 's'})`,
       '',
@@ -115,7 +129,6 @@ async function run() {
     });
 
     if (!res.ok) {
-      console.log('Retrying without components...');
       await fetch(webhookUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

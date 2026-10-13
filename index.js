@@ -1958,6 +1958,7 @@ function resolveConfigPanelPage(interaction, fallbackPage = 1) {
 function buildConfigActionModal(botId, action) {
   switch (action) {
     case 'edit_credentials': return buildCredentialsModal(botId);
+    case 'edit_server_core':
     case 'edit_servercore': return buildServerCoreModal(botId);
     case 'edit_ticket_catnames': return buildTicketCategoryNamesModal(botId);
     case 'edit_ticket_catspawns': return buildTicketCategorySpawnsModal(botId);
@@ -2112,7 +2113,7 @@ export async function handleInteraction(interaction) {
         const isSetupComplete = targetBot.setupCompleted && hasToken && hasApiKey;
 
         const payload = isSetupComplete
-          ? buildConfigPanelPayload(targetBot.botId, requestedPage, true)
+          ? buildConfigPanelPayload(targetBot.botId, requestedPage, false, interaction.guild)
           : buildInitialSetupPayload(targetBot.botId, targetBot);
 
         return sendConfigResponse(payload).catch(err => {
@@ -3515,8 +3516,8 @@ export async function handleInteraction(interaction) {
         const botId = interaction.customId.replace('cfg_role_staff_', '');
         const selectedRoleId = interaction.values?.[0] || '';
         updateBotCustomization(botId, 'botStaffRoleId', selectedRoleId);
-        const payload = buildConfigPanelPayload(botId, 1, false);
-        return interaction.update(payload).catch(() => null);
+        const payload = buildConfigPanelPayload(botId, 1, false, interaction.guild);
+        return interaction.update(payload).catch(async () => interaction.editReply(payload).catch(() => null));
       }
 
       // /config Admin Role Select Menu
@@ -3651,7 +3652,7 @@ export async function handleInteraction(interaction) {
 
         if (value.startsWith('nav_page_')) {
           const targetPage = parseInt(value.replace('nav_page_', ''), 10) || 1;
-          const payload = buildConfigPanelPayload(botId, targetPage, false);
+          const payload = buildConfigPanelPayload(botId, targetPage, false, interaction.guild);
           return interaction.update(payload).catch(() => null);
         }
 
@@ -3674,7 +3675,7 @@ export async function handleInteraction(interaction) {
         if (!m) return;
         const botId = m[1];
         const targetPage = Math.max(1, Math.min(TOTAL_PAGES, parseInt(m[2], 10) || 1));
-        const payload = buildConfigPanelPayload(botId, targetPage, false);
+        const payload = buildConfigPanelPayload(botId, targetPage, false, interaction.guild);
         return interaction.editReply(payload).catch(() => null);
       }
 
@@ -3709,7 +3710,7 @@ export async function handleInteraction(interaction) {
         await interaction.deferUpdate().catch(() => null);
         const botId = interaction.customId.replace('cfg_select_page_', '');
         const targetPage = parseInt(interaction.values[0], 10) || 1;
-        const payload = buildConfigPanelPayload(botId, targetPage, false);
+        const payload = buildConfigPanelPayload(botId, targetPage, false, interaction.guild);
         return interaction.editReply(payload).catch(() => null);
       }
 
@@ -5232,7 +5233,7 @@ export async function handleInteraction(interaction) {
         const embeddedPage = parseInt(parts[1], 10) || 1;
         const curPage = resolveConfigPanelPage(interaction, embeddedPage).page;
         const targetPage = Math.max(1, curPage - 1);
-        const payload = buildConfigPanelPayload(botId, targetPage, false);
+        const payload = buildConfigPanelPayload(botId, targetPage, false, interaction.guild);
         try {
           return await interaction.update(payload);
         } catch (err) {
@@ -5249,7 +5250,7 @@ export async function handleInteraction(interaction) {
         const embeddedPage = parseInt(parts[1], 10) || 1;
         const { page: curPage, total } = resolveConfigPanelPage(interaction, embeddedPage);
         const targetPage = Math.min(total, curPage + 1);
-        const payload = buildConfigPanelPayload(botId, targetPage, false);
+        const payload = buildConfigPanelPayload(botId, targetPage, false, interaction.guild);
         try {
           return await interaction.update(payload);
         } catch (err) {
@@ -5265,7 +5266,7 @@ export async function handleInteraction(interaction) {
         const botId = parts[0];
         const embeddedPage = parseInt(parts[1], 10) || 1;
         const curPage = resolveConfigPanelPage(interaction, embeddedPage).page;
-        const payload = buildConfigPanelPayload(botId, curPage, false);
+        const payload = buildConfigPanelPayload(botId, curPage, false, interaction.guild);
         try {
           return await interaction.update(payload);
         } catch (err) {

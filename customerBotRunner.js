@@ -450,6 +450,7 @@ const reconnectTimeouts = new Map();
  * Debounced self-healing reconnection scheduler
  */
 export function scheduleBotReconnect(botId, delayMs = 3000) {
+  if (botId === MASTER_BOT_ID) return;
   if (reconnectTimeouts.has(botId)) return;
 
   const timer = setTimeout(async () => {
@@ -498,7 +499,7 @@ export function startWatchdog() {
     try {
       const instances = loadBotInstances();
       for (const [bId, bot] of Object.entries(instances)) {
-        if (!bot.token || bot.token.trim() === '' || bot.banned) {
+        if (bId === MASTER_BOT_ID || !bot.token || bot.token.trim() === '' || bot.banned) {
           continue;
         }
 

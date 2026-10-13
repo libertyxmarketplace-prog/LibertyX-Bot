@@ -11,11 +11,10 @@ web/dist/
 Thumbs.db
 bin/*.exe
 scratch/
-data/bot_instances.json
-data/bot_instances.db.json
-data/backups/
+data/*.json
+data/ticket_panels.json
 data/*.tmp
-data/tickets.json
+
 
 # AI Agent folders
 .gemini/

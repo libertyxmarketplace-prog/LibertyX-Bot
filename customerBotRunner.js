@@ -398,10 +398,10 @@ export async function startCustomerBot(botId) {
       clientToUse.removeAllListeners();
       await clientToUse.destroy().catch(() => null);
     }
-    if (err.message && (err.message.includes('An invalid token was provided') || err.code === 'TokenInvalid')) {
-      // Record *when* it failed. This is a retryable verdict, not a permanent
-      // kill switch  - tokens get reset/rotated, so we keep probing on a cooldown
-      // that grows with each consecutive failure.
+    const isTokenInvalid = (err.message && (err.message.includes('An invalid token was provided') || err.message.includes('TokenInvalid'))) || err.code === 'TokenInvalid';
+    const isDisallowedIntents = err.code === 'DisallowedIntents' || (err.message && err.message.includes('disallowed intents'));
+
+    if (isTokenInvalid) {
       const prev = invalidTokenAttempts.get(botId)?.count || 0;
       const count = prev + 1;
       invalidTokenAttempts.set(botId, { count, nextRetryAt: Date.now() + invalidTokenBackoffMs(count) });
@@ -409,7 +409,21 @@ export async function startCustomerBot(botId) {
       console.warn(`[CUSTOMER BOT ${botId}] Token rejected by Discord (attempt ${count}). Next retry in ${waitMin} min.`);
       updateBotInstance(botId, {
         status: 'invalid_token',
-        invalidTokenDetectedAt: new Date().toISOString()
+        invalidTokenDetectedAt: new Date().toISOString(),
+        setupCompleted: false
+      });
+    } else if (isDisallowedIntents) {
+      console.warn(`[CUSTOMER BOT ${botId}] Privileged intents not enabled in Discord Developer Portal.`);
+      updateBotInstance(botId, {
+        status: 'disallowed_intents',
+        invalidTokenDetectedAt: new Date().toISOString(),
+        setupCompleted: false
+      });
+    } else {
+      updateBotInstance(botId, {
+        status: 'error',
+        invalidTokenDetectedAt: new Date().toISOString(),
+        setupCompleted: false
       });
     }
     return false;

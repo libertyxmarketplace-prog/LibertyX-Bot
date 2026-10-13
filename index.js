@@ -2108,9 +2108,9 @@ export async function handleInteraction(interaction) {
           }).catch(() => null);
         }
 
-        const hasToken = Boolean(targetBot.token && targetBot.token.trim().length > 0);
+        const isOnline = targetBot.status === 'active' && Boolean(targetBot.token && targetBot.token.trim().length > 0);
         const hasApiKey = Boolean(targetBot.erlcApiKey && targetBot.erlcApiKey.trim().length > 0);
-        const isSetupComplete = targetBot.setupCompleted && hasToken && hasApiKey;
+        const isSetupComplete = targetBot.setupCompleted && isOnline && hasApiKey;
 
         const payload = isSetupComplete
           ? buildConfigPanelPayload(targetBot.botId, requestedPage, false, interaction.guild)
@@ -3943,8 +3943,8 @@ export async function handleInteraction(interaction) {
 
         const updates = {
           token,
-          status: token ? 'active' : 'unconfigured',
-          setupCompleted: Boolean(token && erlcApiKey),
+          status: token ? 'connecting' : 'unconfigured',
+          setupCompleted: false,
           banned: false,
           bannedReason: null
         };
@@ -3981,9 +3981,9 @@ export async function handleInteraction(interaction) {
         }
 
         const currentBot = getBotInstance(botId);
-        const hasToken = Boolean(currentBot?.token && currentBot.token.trim().length > 0);
+        const isOnline = currentBot?.status === 'active';
         const hasApiKey = Boolean(currentBot?.erlcApiKey && currentBot.erlcApiKey.trim().length > 0);
-        const payload = (hasToken && hasApiKey)
+        const payload = (isOnline && hasApiKey)
           ? buildConfigPanelPayload(botId, 1, false, interaction.guild)
           : buildInitialSetupPayload(botId, currentBot);
         return interaction.editReply(payload).catch(() => null);

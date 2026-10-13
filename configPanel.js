@@ -201,6 +201,7 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = fal
   const embed = new EmbedBuilder()
     .setColor(0x2b2d31)
     .setAuthor({ name: displayName, iconURL: guildIcon || undefined })
+    .setTitle(PAGE_META[activePage - 1]?.title || 'SERVER CONFIGURATION')
     .setFooter({ text: `Page ${activePage} of ${TOTAL_PAGES}` });
 
   if (guildIcon) {

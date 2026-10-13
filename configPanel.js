@@ -77,40 +77,49 @@ function roleRef(id) {
 export function buildInitialSetupPayload(botId, bot) {
   const hasToken = Boolean(bot?.token && bot.token.trim().length > 0);
   const hasApiKey = Boolean(bot?.erlcApiKey && bot.erlcApiKey.trim().length > 0);
+  const isSetupComplete = hasToken && hasApiKey;
 
   const embed = new EmbedBuilder()
     .setColor(0x2b2d31)
-    .setAuthor({ name: 'Mavely', iconURL: 'attachment://mavely_logo.png' })
     .setTitle('Initial Setup')
     .setDescription(
       '> Connect your Discord bot token and ER:LC server key to activate your instance.\n\n' +
       '**Credentials**\n' +
-      `Bot Token: ${hasToken ? 'Connected' : 'Not Configured'}\n` +
-      `ER:LC API Key: ${hasApiKey ? 'Connected' : 'Not Configured'}`
+      `${hasToken ? EMOJIS.CHECK : EMOJIS.CROSS} Bot Token: ${hasToken ? 'Connected' : 'Not Configured'}\n` +
+      `${hasApiKey ? EMOJIS.CHECK : EMOJIS.CROSS} ER:LC API Key: ${hasApiKey ? 'Connected' : 'Not Configured'}\n\n` +
+      '**Assistant**\n' +
+      'Need help with credentials? Click the **Helper** button below for guidance.'
     )
-    .setThumbnail('attachment://mavely_logo.png')
-    .setFooter({ text: 'Mavely • Initial Setup' });
+    .setFooter({ text: 'Initial Setup' });
 
-  const row = new ActionRowBuilder().addComponents(
+  const buttons = [
     new ButtonBuilder()
       .setCustomId(`cfg_btn_initial_setup_${botId}`)
       .setLabel('Setup Credentials')
-      .setStyle(ButtonStyle.Success),
+      .setStyle(ButtonStyle.Success)
+  ];
+
+  if (isSetupComplete) {
+    buttons.push(
+      new ButtonBuilder()
+        .setCustomId(`cfg_btn_skip_setup_${botId}`)
+        .setLabel('Open Config Panel')
+        .setStyle(ButtonStyle.Secondary)
+    );
+  }
+
+  buttons.push(
     new ButtonBuilder()
-      .setCustomId(`cfg_btn_skip_setup_${botId}`)
-      .setLabel('Open Config Panel')
-      .setStyle(ButtonStyle.Secondary)
+      .setCustomId(`cfg_nav_helper_${botId}`)
+      .setLabel('Helper')
+      .setStyle(ButtonStyle.Success)
   );
 
-  const files = [];
-  if (fs.existsSync(MAVELY_LOGO_PATH)) {
-    files.push(new AttachmentBuilder(MAVELY_LOGO_PATH, { name: 'mavely_logo.png' }));
-  }
+  const row = new ActionRowBuilder().addComponents(buttons);
 
   return {
     embeds: [embed],
     components: [row],
-    files,
     flags: 64
   };
 }
@@ -214,7 +223,9 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
         `${staffMark} Staff Role: ${staffDisplay}\n` +
         `${adminMark} Admin Role: ${adminDisplay}\n\n` +
         '**Bot Presence**\n' +
-        `Activity: Watching ${actText}`
+        `Activity: Watching ${actText}\n\n` +
+        '**Assistant**\n' +
+        'Need help? Click the **Helper** button below for guidance.'
       );
 
       // Row 1: Staff Role (Select from Discord roles directly)
@@ -280,7 +291,9 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
         `2. ${categories[1]?.name || 'High Rank'}\n` +
         `3. ${categories[2]?.name || 'Player Report'}\n` +
         `4. ${categories[3]?.name || 'Appeals'}\n` +
-        `5. ${categories[4]?.name || 'Other'}`
+        `5. ${categories[4]?.name || 'Other'}\n\n` +
+        '**Assistant**\n' +
+        'Need help? Click the **Helper** button below for guidance.'
       );
 
       // Row 1: Category Spawn Channel (Select category/channel directly - NO ID TYPING)

@@ -273,8 +273,17 @@ export function getBotInstanceForGuild(guildId, ownerUserId = null) {
 export function getOrCreateBotInstanceForUser(ownerUserId, guildId = null) {
   const instances = loadBotInstances();
   
-  // 1. If guildId is provided, first look for an existing bot already assigned to this guild
+  // 1. If guildId is provided, first look for an existing bot already assigned to this guild with completed setup
   if (guildId) {
+    for (const bot of Object.values(instances)) {
+      if (bot.guildId === guildId && bot.botId !== MASTER_BOT_ID && !bot.banned && bot.token && bot.erlcApiKey && bot.erlcApiKey.length > 5) {
+        if (ownerUserId && !bot.ownerUserId) {
+          bot.ownerUserId = ownerUserId;
+          saveBotInstances(instances);
+        }
+        return bot;
+      }
+    }
     for (const bot of Object.values(instances)) {
       if (bot.guildId === guildId && bot.botId !== MASTER_BOT_ID && !bot.banned) {
         if (ownerUserId && !bot.ownerUserId) {

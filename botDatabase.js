@@ -139,16 +139,22 @@ class BotDatabase {
     this.writeLock = true;
     try {
       const serialized = JSON.stringify(Object.fromEntries(this.cache), null, 2);
-      const tmpFile = `${DB_FILE}.tmp`;
-
-      // 1. Atomic write to DB_FILE
-      fs.writeFileSync(tmpFile, serialized, 'utf-8');
-      fs.renameSync(tmpFile, DB_FILE);
+      // 1. Write to DB_FILE
+      try {
+        fs.writeFileSync(tmpFile, serialized, 'utf-8');
+        fs.renameSync(tmpFile, DB_FILE);
+      } catch {
+        fs.writeFileSync(DB_FILE, serialized, 'utf-8');
+      }
 
       // 2. Sync to legacy COMPAT_FILE for backward compatibility
-      const compatTmp = `${COMPAT_FILE}.tmp`;
-      fs.writeFileSync(compatTmp, serialized, 'utf-8');
-      fs.renameSync(compatTmp, COMPAT_FILE);
+      try {
+        const compatTmp = `${COMPAT_FILE}.tmp`;
+        fs.writeFileSync(compatTmp, serialized, 'utf-8');
+        fs.renameSync(compatTmp, COMPAT_FILE);
+      } catch {
+        fs.writeFileSync(COMPAT_FILE, serialized, 'utf-8');
+      }
 
       this.isDirty = false;
     } catch (saveErr) {

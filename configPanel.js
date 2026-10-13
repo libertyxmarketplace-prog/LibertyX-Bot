@@ -1,15 +1,26 @@
 import {
+  EmbedBuilder,
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
   ModalBuilder,
   TextInputBuilder,
-  TextInputStyle
+  TextInputStyle,
+  RoleSelectMenuBuilder,
+  StringSelectMenuBuilder,
+  AttachmentBuilder
 } from 'discord.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { getBotInstance } from './botManager.js';
 import { AI_CAPABILITIES } from './aiConfigAssistant.js';
 import { getPanelBottomBanner } from './panelMenu.js';
 import { activeCustomerClients } from './customerBotRunner.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const MAVELY_NET_PATH = path.join(__dirname, 'assets', 'mavely_net_clean.png');
 
 export const TOTAL_PAGES = 8;
 
@@ -27,16 +38,15 @@ export const DEFAULT_BOTTOM_BANNER = null;
  * Tab labels are intentionally short so four of them fit cleanly in one action row.
  */
 export const PAGE_META = [
-  { id: 1, tab: 'Core', title: 'CREDENTIALS & SETUP', intro: 'Link your bot, lock in your community identity, and confirm this instance is live.' },
-  { id: 2, tab: 'Tickets', title: 'TICKET CATEGORIES', intro: 'Name the slots members see, route where each ticket is created, and choose who gets alerted.' },
-  { id: 3, tab: 'Appearance', title: 'TICKET APPEARANCE', intro: 'Control the panel headline, the rules gate members must pass, and every banner on show.' },
-  { id: 4, tab: 'Sessions', title: 'LIVE SESSIONS', intro: 'Wire broadcast channels and operating roles, then set the artwork and copy for each stage.' },
-  { id: 5, tab: 'Applications', title: 'STAFF APPLICATIONS', intro: 'Point intake at the right channels and maintain the interview banks for each discipline.' },
-  { id: 6, tab: 'Docs', title: 'STAFF DOCUMENTATION', intro: 'Publish the central staff reference hub, pick its layout, and frame it with artwork.' },
-  { id: 7, tab: 'Staff', title: 'STAFF & COMMUNITY', intro: 'Grant control of this instance, greet new members, and route promotions and infractions.' },
-  { id: 8, tab: 'AI', title: 'AI ASSISTANT', intro: 'Connect a provider and let the assistant rewrite panels, roles, and banners for you.' }
+  { id: 1, tab: 'Permissions', title: 'PERMISSIONS & CORE', intro: 'This is where you can manage your server permissions! If you wanna know more about what these permissions read the documentation' },
+  { id: 2, tab: 'Tickets', title: 'TICKET CATEGORIES', intro: 'Configure your support desk categories, ticket spawn locations, and ping notifications.' },
+  { id: 3, tab: 'Appearance', title: 'TICKET APPEARANCE', intro: 'Customize how members see your ticket panel, rule guidelines, and artwork.' },
+  { id: 4, tab: 'Sessions', title: 'LIVE SESSIONS', intro: 'Configure ER:LC private server patrols, automated announcements, and stage voice chats.' },
+  { id: 5, tab: 'Applications', title: 'STAFF APPLICATIONS', intro: 'Manage staff recruitment pipelines, reviewer channels, and interview banks.' },
+  { id: 6, tab: 'Docs', title: 'STAFF DOCUMENTATION', intro: 'Setup your server central staff reference directory, guidelines, and handbook.' },
+  { id: 7, tab: 'Community', title: 'COMMUNITY & MODULES', intro: 'Manage staff tracking modules: warnings, rank promotions, message quotas, forums, and daily questions.' },
+  { id: 8, tab: 'AI', title: 'MAVELY AI ASSISTANT', intro: 'Powered by Mavely AI: automate server setup, generate customized rules, and update configurations using natural language.' }
 ];
-
 
 function maskSecret(str) {
   if (!str || typeof str !== 'string' || str.trim() === '') return 'Not Set';
@@ -44,253 +54,211 @@ function maskSecret(str) {
   return `${str.slice(0, 4)}...${str.slice(-4)}`;
 }
 
-// Clean plain-text status - no emojis, no backticks, no clutter
-function statusText(isConfigured, yesLabel = 'Configured', noLabel = 'Not set') {
+function statusText(isConfigured, yesLabel = 'Configured', noLabel = 'Not Configured') {
   return isConfigured ? yesLabel : noLabel;
 }
 
 function chanRef(id) {
-  return (id && String(id).trim()) ? `<#${String(id).trim()}>` : 'Not set';
+  return (id && String(id).trim()) ? `<#${String(id).trim()}>` : 'Not Configured';
 }
 
 function roleRef(id) {
-  return (id && String(id).trim()) ? `<@&${String(id).trim()}>` : 'Not set';
+  return (id && String(id).trim()) ? `<@&${String(id).trim()}>` : 'Not Configured';
 }
 
 /**
- * Build the interactive /config control panel payload using Discord Components V2 Container (type 17).
- *
- * Futuristic card layout:
- *  - Emoji-free headers with a stable "Page X of Y" marker (used for reliable arrow navigation)
- *  - Section cards (type 9) with right-aligned action buttons (accessory)
- *  - Two arrow controls (kept as requested) + position pill + Refresh + Helper
+ * Build Initial Setup Gate payload (shown before config when credentials are missing)
+ */
+export function buildInitialSetupPayload(botId, bot) {
+  const hasToken = Boolean(bot?.token && bot.token.trim().length > 0);
+  const hasApiKey = Boolean(bot?.erlcApiKey && bot.erlcApiKey.trim().length > 0);
+
+  const embed = new EmbedBuilder()
+    .setColor(0x2b2d31)
+    .setAuthor({ name: 'Mavely', iconURL: 'attachment://mavely_net_clean.png' })
+    .setTitle('Mavely Setup')
+    .setDescription(
+      '> Welcome to **Mavely**! Before accessing the configuration panel, please connect your Discord bot token and ER:LC server API key below.\n\n' +
+      '🔑 **Setup Credentials**\n' +
+      `╭ \`Bot Token:\` ${hasToken ? 'Configured' : 'Not Configured'}\n` +
+      `╰ \`ER:LC API Key:\` ${hasApiKey ? 'Configured' : 'Not Configured'}\n\n` +
+      'If you need help either go to the [support server](https://discord.gg/mavely) or read the [documentation](https://docs.mavely.bot).'
+    )
+    .setThumbnail('attachment://mavely_net_clean.png')
+    .setFooter({ text: 'Mavely • Initial Setup' });
+
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`cfg_btn_initial_setup_${botId}`)
+      .setLabel('Setup Credentials')
+      .setStyle(ButtonStyle.Success)
+      .setEmoji('⚡'),
+    new ButtonBuilder()
+      .setCustomId(`cfg_btn_skip_setup_${botId}`)
+      .setLabel('Open Config Panel')
+      .setStyle(ButtonStyle.Secondary)
+      .setEmoji('⚙️')
+  );
+
+  const files = [];
+  if (fs.existsSync(MAVELY_NET_PATH)) {
+    files.push(new AttachmentBuilder(MAVELY_NET_PATH, { name: 'mavely_net_clean.png' }));
+  }
+
+  return {
+    embeds: [embed],
+    components: [row],
+    files,
+    flags: 64
+  };
+}
+
+/**
+ * Shared Modules Dropdown Menu (matching reference screenshot)
+ */
+function buildModulesDropdown(botId) {
+  return new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId(`cfg_menu_modules_${botId}`)
+      .setPlaceholder('Modules')
+      .addOptions([
+        { label: 'Infractions', value: 'edit_infractions', description: 'Staff infractions and warnings system', emoji: '🚫' },
+        { label: 'Promotions', value: 'edit_promotions', description: 'Staff promotions and rank logging', emoji: '🛡️' },
+        { label: 'Message Quota', value: 'edit_quota', description: 'Staff message quota and activity tracking', emoji: '💬' },
+        { label: 'Forums', value: 'edit_forums', description: 'Community forums and suggestions hub', emoji: '💭' },
+        { label: 'Daily Questions', value: 'edit_daily_q', description: 'Daily question prompts and polls', emoji: '📅' },
+        { label: 'Permissions & Core', value: 'nav_page_1', description: 'Staff roles and administrator access', emoji: '🔑' },
+        { label: 'Ticket System', value: 'nav_page_2', description: 'Support desk and category channels', emoji: '🎫' },
+        { label: 'Ticket Appearance', value: 'nav_page_3', description: 'Panel headline, guidelines and artwork', emoji: '🎨' },
+        { label: 'Live Sessions', value: 'nav_page_4', description: 'ER:LC server patrols and radios', emoji: '🚔' },
+        { label: 'Staff Applications', value: 'nav_page_5', description: 'Recruitment and interview pipelines', emoji: '📝' },
+        { label: 'Documentation Hub', value: 'nav_page_6', description: 'Staff handbook and policies', emoji: '📚' },
+        { label: 'AI Assistant', value: 'nav_page_8', description: 'Automated configuration with AI', emoji: '🤖' }
+      ])
+  );
+}
+
+/**
+ * Shared Navigation Button Row (matching reference screenshot)
+ */
+function buildNavButtonRow(botId, activePage) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`cfg_nav_prev_${botId}_${activePage}`)
+      .setEmoji('◀')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(activePage <= 1),
+    new ButtonBuilder()
+      .setCustomId(`cfg_nav_page_${botId}_${activePage}`)
+      .setLabel(`${activePage} / ${TOTAL_PAGES}`)
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(true),
+    new ButtonBuilder()
+      .setCustomId(`cfg_nav_next_${botId}_${activePage}`)
+      .setEmoji('▶')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(activePage >= TOTAL_PAGES),
+    new ButtonBuilder()
+      .setCustomId(`cfg_nav_refresh_${botId}_${activePage}`)
+      .setLabel('Refresh')
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId(`cfg_nav_helper_${botId}`)
+      .setLabel('Helper')
+      .setStyle(ButtonStyle.Success)
+  );
+}
+
+/**
+ * Build the interactive /config control panel payload matching exact user screenshots.
  */
 export function buildConfigPanelPayload(botId, page = 1, includeAttachment = true) {
   const bot = getBotInstance(botId);
   if (!bot) {
+    const errEmbed = new EmbedBuilder()
+      .setColor(0xED4245)
+      .setAuthor({ name: 'Mavely', iconURL: 'attachment://mavely_net_clean.png' })
+      .setThumbnail('attachment://mavely_net_clean.png')
+      .setTitle('Bot Not Found')
+      .setDescription(`> No bot instance found matching ID **${botId}**.\n\nPlease verify your Bot ID or run /config again.`);
     return {
-      flags: 32768,
-      components: [
-        {
-          type: 17,
-          components: [
-            {
-              type: 10,
-              content: `# BOT NOT FOUND\n-# No instance matches **${botId}**. Run /config again with a valid Bot ID.`
-            }
-          ]
-        }
-      ]
+      embeds: [errEmbed],
+      components: [],
+      files: fs.existsSync(MAVELY_NET_PATH) ? [new AttachmentBuilder(MAVELY_NET_PATH, { name: 'mavely_net_clean.png' })] : [],
+      flags: 64
     };
   }
 
   const cust = bot.customizations || {};
   const activePage = Math.max(1, Math.min(TOTAL_PAGES, page));
-
-  const containerComponents = [];
+  const rows = [];
   const files = [];
 
-  // ── Layout helpers ──────────────────────────────────────────────────────
-  const act = (action, label, style = 2) => ({
-    type: 2,
-    style,
-    label,
-    custom_id: `cfg_act_${botId}_${action}`
-  });
+  if (fs.existsSync(MAVELY_NET_PATH)) {
+    files.push(new AttachmentBuilder(MAVELY_NET_PATH, { name: 'mavely_net_clean.png' }));
+  }
 
-  let cardPillSeq = 0;
-  const card = (text, accessory = null, pillLabel = 'Read only') => {
-    // Sub-lines render as blockquotes ("> ") for a cleaner reference-style read
-    const content = text.replace(/^-# /gm, '> ');
-    const section = { type: 9, components: [{ type: 10, content }] };
-    // Discord requires an accessory on every Section - use a disabled pill when none is given
-    section.accessory = accessory || {
-      type: 2,
-      style: 2,
-      label: pillLabel,
-      custom_id: `cfg_pill_${botId}_card_${++cardPillSeq}`,
-      disabled: true
-    };
-    return section;
-  };
-
-  // ── Page directory ─────────────────────────────────────────────────────
-  // Intro copy rendered as a blockquote under every page title
-  const PAGE_INTROS = {
-    1: 'Your bot control room. Credentials, secrets and live link state live here, and are never exposed to server members.',
-    2: 'The support lanes members pick from, and exactly where each one opens its ticket. Name a slot, point it at a channel, then choose who gets pinged.',
-    3: 'How the ticket panel reads to members: headline copy, the rules gate they pass before opening a ticket, and the artwork framing it all.',
-    4: 'Everything that powers an ER:LC live session: broadcast channels, operating roles, banner artwork and announcement copy.',
-    5: 'Staff intake. Decide where submissions land, who publishes results, and edit the interview banks used during review.',
-    6: 'The documentation hub your team opens whenever they need a reference at hand, including layout and artwork.',
-    7: 'Access control, greeting cards, promotions and infraction logging for your staff team.',
-    8: 'Connect an AI provider, then describe the change you want in plain English and let the assistant apply it for you.'
-  };
-  // Per-page index dropdown - mirrors the reference "index" row at the top
-  const PAGE_INDEX = {
-    1: [
-      { label: 'Bot Token & API Key', desc: 'Discord token and ER:LC key', action: 'edit_credentials' },
-      { label: 'Server Details', desc: 'Community name and join code', action: 'edit_servercore' }
-    ],
-    2: [
-      { label: 'Category Names', desc: 'Name the five ticket slots', action: 'edit_ticket_catnames' },
-      { label: 'Spawn Channels', desc: 'Where each slot opens a ticket', action: 'edit_ticket_catspawns' },
-      { label: 'Alert Roles', desc: 'Who gets pinged on open', action: 'edit_ticket_catpings' },
-      { label: 'Claim & Transcripts', desc: 'Archive target and claim role', action: 'edit_ticket_banners' }
-    ],
-    3: [
-      { label: 'Panel Text', desc: 'Panel title and inside greeting', action: 'edit_ticket_text' },
-      { label: 'Rules & Greeting', desc: 'Rules button, name and content', action: 'edit_rules_greeting' },
-      { label: 'Banners', desc: 'Header, inside and accent art', action: 'edit_ticket_banners' },
-      { label: 'Reset Banners', desc: 'Clear every banner back to default', action: 'reset_banners' }
-    ],
-    4: [
-      { label: 'Channels & Roles', desc: 'Announcements, radios, host', action: 'edit_session_channels' },
-      { label: 'Session Banners', desc: 'Live, vote and concluded art', action: 'edit_session_banners' },
-      { label: 'Announcement Text', desc: 'Startup and closing copy', action: 'edit_session_text' }
-    ],
-    5: [
-      { label: 'Application Channels', desc: 'Review and results feeds', action: 'edit_app_channels' },
-      { label: 'In-Game Interview Bank', desc: 'Questions asked in game', action: 'edit_app_questions_ingame' },
-      { label: 'Discord Interview Bank', desc: 'Questions asked on Discord', action: 'edit_app_questions_discord' }
-    ],
-    6: [
-      { label: 'Text & Layout', desc: 'Hub title and display mode', action: 'edit_staffdocs_content' },
-      { label: 'Banners', desc: 'Top and bottom artwork', action: 'edit_staffdocs_banners' },
-      { label: 'Destination', desc: 'Where the hub is posted', action: 'edit_staffdocs_channel' }
-    ],
-    7: [
-      { label: 'Staff Role', desc: 'Who can manage this instance', action: 'edit_staffrole' },
-      { label: 'Welcome Setup', desc: 'Greeting card and banner', action: 'edit_welcome' },
-      { label: 'Promotions', desc: 'Rank-up announcements', action: 'edit_promotions' },
-      { label: 'Infractions', desc: 'Disciplinary records', action: 'edit_infractions' }
-    ],
-    8: [
-      { label: 'API Key & Provider', desc: 'Connect an AI provider', action: 'edit_ai_key' },
-      { label: 'Ask AI Assistant', desc: 'Describe a change in English', action: 'ask_ai' }
-    ]
-  };
-
-  // Closing notice rendered above the navigation deck on every page
-  const PAGE_NOTES = {
-    1: 'Never share your bot token - anyone holding it has full control of the account.',
-    2: 'Slot names are what members read, so keep them short and unmistakable.',
-    3: 'The rules gate is enforced on the ticket panel and inside every new ticket.',
-    4: 'Sessions only broadcast once a host has been granted the host role.',
-    5: 'Closed positions hide themselves from the public application hub automatically.',
-    6: 'Documentation is visible to staff only - keep sensitive material out of it.',
-    7: 'Falling back to server administrators is always safe if a role is left unset.',
-    8: 'The assistant only ever writes to this bot instance, never anything global.'
-  };
-  const header = (title) => {
-    containerComponents.push({
-      type: 10,
-      content: [
-        `# ${title}`,
-        `-# Page ${activePage} of ${TOTAL_PAGES} \u2022 ${botId}`,
-        '',
-        `> ${PAGE_INTROS[activePage] || ''}`
-      ].join('\n')
-    });
-
-
-    // Index dropdown listing everything this page can edit
-    const indexEntries = PAGE_INDEX[activePage] || [];
-    if (indexEntries.length > 0) {
-      containerComponents.push({
-        type: 1,
-        components: [{
-          type: 3,
-          custom_id: `cfg_index_${botId}_${activePage}`,
-          placeholder: 'Select a setting to open\u2026',
-          options: indexEntries.map(e => ({
-            label: e.label,
-            description: e.desc,
-            value: e.action
-          }))
-        }]
-      });
-    }
-
-    containerComponents.push({ type: 14, divider: true, spacing: 1 });
-  };
+  const embed = new EmbedBuilder()
+    .setColor(0x2b2d31)
+    .setAuthor({ name: 'Mavely', iconURL: 'attachment://mavely_net_clean.png' })
+    .setThumbnail('attachment://mavely_net_clean.png')
+    .setFooter({ text: `Mavely • Page ${activePage} of ${TOTAL_PAGES}` });
 
   switch (activePage) {
     // ══════════════════════════════════════════════════════════════════════
-    // PAGE 1: CREDENTIALS & SETUP
+    // PAGE 1: PERMISSIONS & CORE
     // ══════════════════════════════════════════════════════════════════════
     case 1: {
-      const hasToken = Boolean(bot.token && bot.token.trim().length > 0);
-      const hasApiKey = Boolean(bot.erlcApiKey && bot.erlcApiKey.trim().length > 0);
-      const isClientOnline = activeCustomerClients.has(botId);
-      const botStatus = bot.banned
-        ? 'Suspended'
-        : (isClientOnline ? 'Online' : (bot.status === 'invalid_token' ? 'Invalid Token' : (hasToken ? 'Active' : 'Unconfigured')));
+      const staffDisplay = cust.botStaffRoleId ? `<@&${cust.botStaffRoleId}>` : 'Not Configured';
+      const adminRole = cust.adminRoleId || (Array.isArray(cust.staffRoleIds) && cust.staffRoleIds[0]) || '';
+      const adminDisplay = adminRole ? `<@&${adminRole}>` : 'Not Configured';
 
-      let discordBotId = bot.discordBotId || null;
-      if (!discordBotId && hasToken) {
-        try {
-          const rawId = Buffer.from(bot.token.split('.')[0], 'base64').toString('utf-8');
-          if (/^\d{17,20}$/.test(rawId)) {
-            discordBotId = rawId;
-          }
-        } catch {}
-      }
+      embed.setDescription(
+        '> This is where you can manage your server\'s permissions! If you wanna know more about what these permissions read the [documentation](https://docs.mavely.bot)\n\n' +
+        '🔑 **Permissions**\n' +
+        `╭ \`Staff Role:\` ${staffDisplay}\n` +
+        `╰ \`Admin Role:\` ${adminDisplay}\n\n` +
+        'If you need help either go to the [support server](https://discord.gg/mavely) or read the [documentation](https://docs.mavely.bot).'
+      );
 
-      const discordBotDisplay = discordBotId
-        ? `<@${discordBotId}>`
-        : (hasToken ? 'Token linked' : 'Not linked');
-
-      const ownerDisplay = (bot.ownerUserId && bot.ownerUserId !== 'OWNER')
-        ? `<@${bot.ownerUserId}>`
-        : 'Server administrators';
-
-      header('CREDENTIALS & SETUP');
-
-      containerComponents.push(card(
-        [
-          `**Connection**`,
-          `-# Discord identity, secrets, and live state`,
-          `**Linked Bot** • ${discordBotDisplay}`,
-          `**Bot Token** • ${statusText(hasToken)}`,
-          `**ER:LC API Key** • ${statusText(hasApiKey)}`,
-          `**State** • ${botStatus}`
-        ].join('\n'),
+      // Row 1: Staff Role (Role Select Menu)
+      rows.push(new ActionRowBuilder().addComponents(
+        new RoleSelectMenuBuilder()
+          .setCustomId(`cfg_role_staff_${botId}`)
+          .setPlaceholder('Staff Role')
       ));
 
-      containerComponents.push(card(
-        [
-          `**In-Game Server**`,
-          `-# Community identity used across every panel`,
-          `**Community Name** • ${cust.serverName?.trim() || 'Not set'}`,
-          `**Join Code** • ${cust.joinCode?.trim() || 'Not set'}`
-        ].join('\n'),
+      // Row 2: Admin Role (Role Select Menu)
+      rows.push(new ActionRowBuilder().addComponents(
+        new RoleSelectMenuBuilder()
+          .setCustomId(`cfg_role_admin_${botId}`)
+          .setPlaceholder('Admin Role')
       ));
 
-      containerComponents.push(card(
-        [
-          `**Ownership**`,
-          `-# Instance assignment and control`,
-          `**Assigned Owner** • ${ownerDisplay}`,
-          `**Instance** • \`${botId}\``
-        ].join('\n')
+      // Row 3: Advanced Permissions (String Select Menu)
+      rows.push(new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId(`cfg_menu_advperm_${botId}`)
+          .setPlaceholder('Advanced Permissions')
+          .addOptions([
+            { label: 'Staff Role Permissions', value: 'edit_staffrole', description: 'Configure bot staff permissions' },
+            { label: 'Ticket Claim Role', value: 'edit_ticket_banners', description: 'Configure who can claim tickets' },
+            { label: 'Session Host Role', value: 'edit_session_channels', description: 'Configure ER:LC patrol hosts' },
+            { label: 'Infraction Issuer Role', value: 'edit_infractions', description: 'Configure supervisors allowed to infract' },
+            { label: 'Promotion Manager Role', value: 'edit_promotions', description: 'Configure managers allowed to promote' },
+            { label: 'Bot Token & API Key', value: 'edit_credentials', description: 'Update Discord token and ER:LC key' },
+            { label: 'Server Identity', value: 'edit_servercore', description: 'Community name and join code' }
+          ])
       ));
 
-      if (discordBotId) {
-        containerComponents.push({
-          type: 1,
-          components: [
-            {
-              type: 2,
-              style: 5,
-              label: 'Invite Bot',
-              url: `https://discord.com/oauth2/authorize?client_id=${discordBotId}&permissions=8&scope=bot%20applications.commands`
-            }
-          ]
-        });
-      }
+      // Row 4: Modules Dropdown
+      rows.push(buildModulesDropdown(botId));
+
+      // Row 5: Navigation Button Row
+      rows.push(buildNavButtonRow(botId, 1));
       break;
     }
+
     // ══════════════════════════════════════════════════════════════════════
     // PAGE 2: TICKET CATEGORIES
     // ══════════════════════════════════════════════════════════════════════
@@ -306,139 +274,107 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
         ? cust.ticketCategories
         : defaultCategories;
 
-      const slot = (c, i) => {
-        const n = String(i + 1).padStart(2, '0');
-        return `**${n}** • ${c.name || `Slot ${n}`}`;
-      };
+      embed.setDescription(
+        '> Configure your support desk categories, ticket spawn locations, and ping notifications.\n\n' +
+        '🎫 **Ticket Categories**\n' +
+        `╭ Slot 1: ${categories[0]?.name || 'General Support'}\n` +
+        `├ Slot 2: ${categories[1]?.name || 'High Rank'}\n` +
+        `├ Slot 3: ${categories[2]?.name || 'Player Report'}\n` +
+        `├ Slot 4: ${categories[3]?.name || 'Appeals'}\n` +
+        `╰ Slot 5: ${categories[4]?.name || 'Other'}\n\n` +
+        '📁 **Spawn & Archiving**\n' +
+        `╭ Transcripts: ${chanRef(cust.transcriptsChannelId)}\n` +
+        `╰ Claim Role: ${roleRef(cust.ticketClaimRoleId)}\n\n` +
+        'If you need help either go to the support server or read the documentation.'
+      );
 
-      header('TICKET CATEGORIES');
-
-      containerComponents.push(card(
-        [
-          `**Category Directory**`,
-          `-# Named slots rendered on the ticket panel`,
-          categories.map((c, i) => slot(c, i)).join('\n')
-        ].join('\n'),
+      // Row 1: Category Settings Actions
+      rows.push(new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId(`cfg_index_${botId}_2`)
+          .setPlaceholder('Select a ticket setting to edit...')
+          .addOptions([
+            { label: 'Category Names', value: 'edit_ticket_catnames', description: 'Name the 5 ticket categories' },
+            { label: 'Spawn Channels', value: 'edit_ticket_catspawns', description: 'Where each category creates tickets' },
+            { label: 'Alert Roles', value: 'edit_ticket_catpings', description: 'Roles alerted when a ticket opens' },
+            { label: 'Transcripts & Claim Role', value: 'edit_ticket_banners', description: 'Set transcript log and claim role' }
+          ])
       ));
 
-      containerComponents.push(card(
-        [
-          `**Spawn Routing**`,
-          `-# Where each slot creates its ticket channel`,
-          categories.map((c, i) =>
-            `${slot(c, i)} → ${c.spawnCategoryId ? `<#${c.spawnCategoryId}>` : 'not set'}`
-          ).join('\n')
-        ].join('\n'),
-      ));
+      // Row 2: Modules Dropdown
+      rows.push(buildModulesDropdown(botId));
 
-      containerComponents.push(card(
-        [
-          `**Staff Alerts**`,
-          `-# Roles pinged the moment a ticket opens`,
-          categories.map((c, i) =>
-            `${slot(c, i)} → ${c.pingRoleId ? `<@&${c.pingRoleId}>` : 'no ping'}`
-          ).join('\n')
-        ].join('\n'),
-      ));
-
-      containerComponents.push(card(
-        [
-          `**Archiving**`,
-          `-# Transcript destination and claim permissions`,
-          `**Transcripts** • ${chanRef(cust.transcriptsChannelId)}`,
-          `**Claim Role** • ${roleRef(cust.ticketClaimRoleId)}`
-        ].join('\n'),
-      ));
+      // Row 3: Navigation Button Row
+      rows.push(buildNavButtonRow(botId, 2));
       break;
     }
 
     // ══════════════════════════════════════════════════════════════════════
-    // PAGE 3: TICKET APPEARANCE - PANEL / RULES & GREETING / GRAPHICS
+    // PAGE 3: TICKET APPEARANCE
     // ══════════════════════════════════════════════════════════════════════
     case 3: {
-      const insideBanner = cust.ticketInsideBannerUrl ? 'Custom' : 'Default';
-      const topBanner = cust.topBannerUrl ? 'Custom' : 'Default';
-      const bottomBanner = cust.bottomBannerUrl ? 'Custom' : 'Default';
-      const openGreeting = cust.ticketOpenMessage
-        ? `"${cust.ticketOpenMessage.slice(0, 60)}${cust.ticketOpenMessage.length > 60 ? '...' : ''}"`
-        : 'Built-in support welcome';
-      const showRules = cust.showRulesButton !== false;
+      embed.setDescription(
+        '> Customize how members see your ticket panel, rule guidelines, and artwork.\n\n' +
+        '🎨 **Panel Display**\n' +
+        `╭ Panel Title: ${cust.panelTitle || 'Mavely Support'}\n` +
+        `├ Rules Button: ${cust.showRulesButton !== false ? 'Visible' : 'Hidden'}\n` +
+        `├ Rules Content: ${cust.rulesDescription ? 'Custom' : 'Default'}\n` +
+        `╰ Inside Greeting: ${cust.ticketOpenMessage ? 'Custom' : 'Default'}\n\n` +
+        '🖼️ **Artwork**\n' +
+        `╭ Top Banner: ${cust.topBannerUrl ? 'Custom' : 'Default'}\n` +
+        `├ Inside Banner: ${cust.ticketInsideBannerUrl ? 'Custom' : 'Default'}\n` +
+        `╰ Bottom Accent: ${cust.bottomBannerUrl ? 'Custom' : 'Default'}\n\n` +
+        'If you need help either go to the support server or read the documentation.'
+      );
 
-      header('TICKET APPEARANCE');
-
-      containerComponents.push(card(
-        [
-          `**Panel**`,
-          `-# Headline members see above the ticket controls`,
-          `**Title** • ${cust.panelTitle || 'Support'}`,
-          `**Header Banner** • ${topBanner}`,
-          `**Inside Banner** • ${insideBanner}`
-        ].join('\n'),
+      rows.push(new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId(`cfg_index_${botId}_3`)
+          .setPlaceholder('Select appearance setting to edit...')
+          .addOptions([
+            { label: 'Panel Text', value: 'edit_ticket_text', description: 'Panel headline and welcome copy' },
+            { label: 'Rules & Greeting', value: 'edit_rules_greeting', description: 'Rules button name and modal text' },
+            { label: 'Banners & Artwork', value: 'edit_ticket_banners', description: 'Header, inside, and bottom artwork' },
+            { label: 'Reset Banners', value: 'reset_banners', description: 'Restore all banners back to default' }
+          ])
       ));
 
-      containerComponents.push(card(
-        [
-          `**Rules & Greeting**`,
-          `-# Gate members pass before opening a ticket`,
-          `**Rules Button** • ${showRules ? 'Visible' : 'Hidden'} (blue)`,
-          `**Button Name** • "${cust.rulesButtonLabel || 'Rules'}"`,
-          `**Rules Content** • ${cust.rulesDescription ? 'Custom' : 'Default'}`,
-          `**Inside Greeting** • ${openGreeting}`
-        ].join('\n'),
-      ));
-
-      containerComponents.push(card(
-        [
-          `**Graphics**`,
-          `-# Artwork used across the ticket experience`,
-          `**Header Banner** • ${topBanner}`,
-          `**Inside Banner** • ${insideBanner}`,
-          `**Bottom Accent** • ${bottomBanner}`
-        ].join('\n'),
-      ));
-
+      rows.push(buildModulesDropdown(botId));
+      rows.push(buildNavButtonRow(botId, 3));
       break;
     }
+
     // ══════════════════════════════════════════════════════════════════════
     // PAGE 4: LIVE SESSIONS
     // ══════════════════════════════════════════════════════════════════════
     case 4: {
-      const liveBanner = cust.sessionTopBannerUrl ? 'Custom' : 'Default';
-      const shutBanner = cust.sessionShutdownBannerUrl ? 'Custom' : 'Default';
-      const voteBanner = cust.sessionVoteTopBannerUrl ? 'Custom' : 'Default';
+      embed.setDescription(
+        '> Configure ER:LC private server patrols, automated announcements, and stage voice chats.\n\n' +
+        '🚔 **Live Patrol System**\n' +
+        `╭ Announcement Channel: ${chanRef(cust.sessionChannelId)}\n` +
+        `├ In-Game Radio VC: ${chanRef(cust.ingameVcId)}\n` +
+        `├ Queue Staging VC: ${chanRef(cust.queueVcId)}\n` +
+        `├ Patrol Host Role: ${roleRef(cust.hostRoleId)}\n` +
+        `╰ Notification Role: ${roleRef(cust.notificationRoleId)}\n\n` +
+        '⚡ **Server Connection**\n' +
+        `╭ Join Code: ${cust.joinCode || 'Not Set'}\n` +
+        `╰ ER:LC API Key: ${bot.erlcApiKey ? 'Linked' : 'Not Set'}\n\n` +
+        'If you need help either go to the support server or read the documentation.'
+      );
 
-      header('LIVE SESSIONS');
-
-      containerComponents.push(card(
-        [
-          `**Channels & Access**`,
-          `-# Broadcast targets and operating roles`,
-          `**Announcements** • ${chanRef(cust.sessionChannelId)}`,
-          `**In-Game Radio** • ${chanRef(cust.ingameVcId)}`,
-          `**Queue Staging** • ${chanRef(cust.queueVcId)}`,
-          `**Session Host** • ${roleRef(cust.hostRoleId)}`,
-          `**Staff Alerts** • ${roleRef(cust.notificationRoleId)}`
-        ].join('\n'),
+      rows.push(new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId(`cfg_index_${botId}_4`)
+          .setPlaceholder('Select live session setting to edit...')
+          .addOptions([
+            { label: 'Channels & Access Roles', value: 'edit_session_channels', description: 'Announcements, voice channels, host role' },
+            { label: 'Session Banners', value: 'edit_session_banners', description: 'Live, vote, and concluded artwork' },
+            { label: 'Announcement Copy', value: 'edit_session_text', description: 'Startup and closing message text' }
+          ])
       ));
 
-      containerComponents.push(card(
-        [
-          `**Visual Package**`,
-          `-# Banners shown at each session phase`,
-          `**Live Stage** • ${liveBanner}`,
-          `**Vote Stage** • ${voteBanner}`,
-          `**Concluded Stage** • ${shutBanner}`
-        ].join('\n'),
-      ));
-
-      containerComponents.push(card(
-        [
-          `**Announcement Copy**`,
-          `-# Headlines posted when sessions open and close`,
-          `**Startup Headline** • ${cust.sessionStartTitle || 'Default'}`,
-          `**Concluded Headline** • ${cust.sessionShutdownTitle || 'Default'}`
-        ].join('\n'),
-      ));
+      rows.push(buildModulesDropdown(botId));
+      rows.push(buildNavButtonRow(botId, 4));
       break;
     }
 
@@ -446,243 +382,144 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
     // PAGE 5: STAFF APPLICATIONS
     // ══════════════════════════════════════════════════════════════════════
     case 5: {
-      const isIngameOpen = cust.appIngameOpen !== false;
-      const isDiscordOpen = cust.appDiscordOpen !== false;
-      const ingameQCount = Array.isArray(cust.appQuestionsIngame) ? cust.appQuestionsIngame.length : 5;
-      const discordQCount = Array.isArray(cust.appQuestionsDiscord) ? cust.appQuestionsDiscord.length : 5;
+      embed.setDescription(
+        '> Manage staff recruitment pipelines, reviewer channels, and interview banks.\n\n' +
+        '📝 **Intake Pipeline**\n' +
+        `╭ Submissions Review: ${chanRef(cust.reviewChannelId)}\n` +
+        `├ Public Results Feed: ${chanRef(cust.resultsChannelId)}\n` +
+        `├ In-Game Moderator: ${cust.appIngameOpen !== false ? 'Open' : 'Closed'}\n` +
+        `╰ Discord Moderator: ${cust.appDiscordOpen !== false ? 'Open' : 'Closed'}\n\n` +
+        '❓ **Interview Banks**\n' +
+        `╭ In-Game Questions: Loaded\n` +
+        `╰ Discord Questions: Loaded\n\n` +
+        'If you need help either go to the support server or read the documentation.'
+      );
 
-      header('STAFF APPLICATIONS');
-
-      containerComponents.push(card(
-        [
-          `**Review Pipeline**`,
-          `-# Where submissions land and get published`,
-          `**Review Feed** • ${chanRef(cust.reviewChannelId)}`,
-          `**Results Channel** • ${chanRef(cust.resultsChannelId)}`
-        ].join('\n'),
+      rows.push(new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId(`cfg_index_${botId}_5`)
+          .setPlaceholder('Select application setting to edit...')
+          .addOptions([
+            { label: 'Review & Results Channels', value: 'edit_app_channels', description: 'Where applications land and publish' },
+            { label: 'In-Game Interview Questions', value: 'edit_app_questions_ingame', description: 'Questions asked in-game' },
+            { label: 'Discord Interview Questions', value: 'edit_app_questions_discord', description: 'Questions asked for Discord' }
+          ])
       ));
 
-      containerComponents.push(card(
-        [
-          `**Open Positions**`,
-          `-# Intake toggles per discipline`,
-          `**In-Game Moderator** • ${isIngameOpen ? 'Open' : 'Closed'}`,
-          `**Discord Moderator** • ${isDiscordOpen ? 'Open' : 'Closed'}`
-        ].join('\n')
-      ));
-
-      containerComponents.push(card(
-        [
-          `**In-Game Interview Bank**`,
-          `-# Questions asked during in-game interviews`,
-          `**Questions Loaded** • ${ingameQCount}`
-        ].join('\n'),
-      ));
-
-      containerComponents.push(card(
-        [
-          `**Discord Interview Bank**`,
-          `-# Questions asked during Discord interviews`,
-          `**Questions Loaded** • ${discordQCount}`
-        ].join('\n'),
-      ));
+      rows.push(buildModulesDropdown(botId));
+      rows.push(buildNavButtonRow(botId, 5));
       break;
     }
+
     // ══════════════════════════════════════════════════════════════════════
     // PAGE 6: STAFF DOCUMENTATION
     // ══════════════════════════════════════════════════════════════════════
     case 6: {
-      const layoutMode = cust.staffDocsLayout === 'buttons' ? 'Buttons' : 'Dropdown menu';
-      const topBannerStatus = cust.staffDocsTopBannerUrl ? 'Custom' : 'Default';
-      const bottomBannerStatus = cust.staffDocsBottomBannerUrl ? 'Custom' : 'Default';
+      embed.setDescription(
+        '> Setup your server\'s central staff reference directory, guidelines, and handbook.\n\n' +
+        '📚 **Staff Documentation Hub**\n' +
+        `╭ Destination Channel: ${chanRef(cust.staffDocsChannelId)}\n` +
+        `├ Display Layout: ${cust.staffDocsLayout === 'buttons' ? 'Buttons' : 'Dropdown Menu'}\n` +
+        `├ Hub Title: ${cust.staffDocsTitle || 'Official Staff Documentation'}\n` +
+        `╰ Header Artwork: ${cust.staffDocsTopBannerUrl ? 'Custom' : 'Default'}\n\n` +
+        'If you need help either go to the support server or read the documentation.'
+      );
 
-      header('STAFF DOCUMENTATION');
-
-      containerComponents.push(card(
-        [
-          `**Documentation Hub**`,
-          `-# Central home for staff references`,
-          `**Destination** • ${chanRef(cust.staffDocsChannelId)}`,
-          `**Layout** • ${layoutMode}`,
-          `**Title** • ${cust.staffDocsTitle || 'Official Staff Documentation'}`
-        ].join('\n'),
+      rows.push(new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId(`cfg_index_${botId}_6`)
+          .setPlaceholder('Select documentation setting to edit...')
+          .addOptions([
+            { label: 'Text & Layout Mode', value: 'edit_staffdocs_content', description: 'Hub title, welcome text, display mode' },
+            { label: 'Header & Footer Banners', value: 'edit_staffdocs_banners', description: 'Top and bottom artwork' },
+            { label: 'Destination Channel', value: 'edit_staffdocs_channel', description: 'Where documentation hub is posted' }
+          ])
       ));
 
-      containerComponents.push(card(
-        [
-          `**Graphics**`,
-          `-# Artwork framing the documentation hub`,
-          `**Top Banner** • ${topBannerStatus}`,
-          `**Bottom Banner** • ${bottomBannerStatus}`
-        ].join('\n'),
-      ));
-
-      containerComponents.push(card(
-        [
-          `**Destination**`,
-          `-# Where the hub gets published`,
-          `**Channel** • ${chanRef(cust.staffDocsChannelId)}`
-        ].join('\n'),
-      ));
+      rows.push(buildModulesDropdown(botId));
+      rows.push(buildNavButtonRow(botId, 6));
       break;
     }
 
     // ══════════════════════════════════════════════════════════════════════
-    // PAGE 7: STAFF & COMMUNITY
+    // PAGE 7: COMMUNITY & MODULES
     // ══════════════════════════════════════════════════════════════════════
     case 7: {
-      header('STAFF & COMMUNITY');
+      embed.setDescription(
+        '> Manage staff tracking modules: warnings, rank promotions, message quotas, forums, and daily questions.\n\n' +
+        '🚫 **Infractions System**\n' +
+        `╭ Channel: ${chanRef(cust.infractionsChannelId)}\n` +
+        `╰ Supervisor Role: ${roleRef(cust.infractionStaffRoleId)}\n\n` +
+        '🛡️ **Promotions System**\n' +
+        `╭ Channel: ${chanRef(cust.promotionsChannelId)}\n` +
+        `╰ Promoter Role: ${roleRef(cust.promotionStaffRoleId)}\n\n` +
+        '💬 **Community Modules**\n' +
+        `╭ Message Quota: ${cust.quotaRequirement || '100'} msgs/week\n` +
+        `├ Community Forums: ${chanRef(cust.forumChannelId)}\n` +
+        `╰ Daily Questions: ${chanRef(cust.dailyQuestionsChannelId)} (${cust.dailyQuestionsTime || '12:00 PM'})\n\n` +
+        'If you need help either go to the support server or read the documentation.'
+      );
 
-      containerComponents.push(card(
-        [
-          `**Access Control**`,
-          `-# Who can manage this instance`,
-          `**Staff Role** • ${roleRef(cust.botStaffRoleId)}`,
-          `**Fallback** • Server administrators`
-        ].join('\n'),
+      rows.push(new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId(`cfg_index_${botId}_7`)
+          .setPlaceholder('Select community module to edit...')
+          .addOptions([
+            { label: 'Infractions System', value: 'edit_infractions', description: 'Disciplinary logging and auto-roles' },
+            { label: 'Promotions System', value: 'edit_promotions', description: 'Rank-up announcements and congratulations' },
+            { label: 'Message Quota', value: 'edit_quota', description: 'Weekly message activity targets' },
+            { label: 'Community Forums', value: 'edit_forums', description: 'Feedback forum channels' },
+            { label: 'Daily Questions', value: 'edit_daily_q', description: 'Automated engagement questions' },
+            { label: 'Welcome Card', value: 'edit_welcome', description: 'New member greeting setup' }
+          ])
       ));
 
-      containerComponents.push(card(
-        [
-          `**Welcome System**`,
-          `-# Greeting card delivered to new members`,
-          `**Channel** • ${chanRef(cust.welcomeChannelId)}`,
-          `**Status** • ${cust.welcomeEnabled && cust.welcomeChannelId ? 'Enabled' : 'Disabled'}`,
-          `**Banner** • ${cust.welcomeBannerUrl ? 'Custom' : 'Default'}`
-        ].join('\n'),
-      ));
-
-      containerComponents.push(card(
-        [
-          `**Promotions**`,
-          `-# Rank-up announcements and recognition`,
-          `**Channel** • ${chanRef(cust.promotionsChannelId)}`,
-          `**Ping Role** • ${roleRef(cust.promotionStaffRoleId)}`,
-          `**Banner** • ${cust.promoteBannerUrl ? 'Custom' : 'Default'}`
-        ].join('\n'),
-      ));
-
-      containerComponents.push(card(
-        [
-          `**Infractions**`,
-          `-# Disciplinary records and staff action logs`,
-          `**Channel** • ${chanRef(cust.infractionsChannelId)}`,
-          `**Ping Role** • ${roleRef(cust.infractionStaffRoleId)}`,
-          `**Banner** • ${cust.infractBannerUrl ? 'Custom' : 'Default'}`
-        ].join('\n'),
-      ));
+      rows.push(buildModulesDropdown(botId));
+      rows.push(buildNavButtonRow(botId, 7));
       break;
     }
+
     // ══════════════════════════════════════════════════════════════════════
-    // PAGE 8: AI ASSISTANT
+    // PAGE 8: MAVELY AI ASSISTANT
     // ══════════════════════════════════════════════════════════════════════
     case 8: {
       const activeAiProv = (cust.aiProvider || bot.aiProvider || 'openrouter').toUpperCase();
       const hasAiKey = Boolean(cust.aiApiKey || bot.aiApiKey);
       const activeModel = cust.aiModel || (activeAiProv === 'GEMINI' ? 'gemini-1.5-flash' : activeAiProv === 'GROQ' ? 'llama-3.3-70b' : 'gpt-4o-mini');
 
-      header('AI ASSISTANT');
+      embed.setDescription(
+        '> Powered by Mavely AI: automate server setup, generate customized rules, and update configurations using natural language.\n\n' +
+        '🤖 **Mavely AI Engine**\n' +
+        `╭ Provider: ${activeAiProv}\n` +
+        `├ Status: ${statusText(hasAiKey, 'Connected', 'Not Connected')}\n` +
+        `╰ Model: ${activeModel}\n\n` +
+        '✨ **Smart Capabilities**\n' +
+        '╭ Rewrite ticket panels, welcome messages, and rules\n' +
+        '├ Configure channels, categories, and staff permissions\n' +
+        '╰ Instant automated server configuration\n\n' +
+        'If you need help either go to the support server or read the documentation.'
+      );
 
-      containerComponents.push(card(
-        [
-          `**Link Status**`,
-          `-# Provider connection powering smart setup`,
-          `**Provider** • ${activeAiProv}`,
-          `**API Key** • ${statusText(hasAiKey, 'Connected', 'Not set')}`,
-          `**Model** • ${activeModel}`
-        ].join('\n'),
+      rows.push(new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId(`cfg_index_${botId}_8`)
+          .setPlaceholder('Select AI Assistant action...')
+          .addOptions([
+            { label: 'Ask AI Assistant', value: 'ask_ai', description: 'Describe a change in English to apply' },
+            { label: 'API Key & Provider', value: 'edit_ai_key', description: 'Connect an OpenRouter or OpenAI key' }
+          ])
       ));
 
-      containerComponents.push(card(
-        [
-          `**Capabilities**`,
-          `-# What the assistant can change for you`,
-          `• Rewrite ticket panels, welcome messages, and rules`,
-          `• Configure radios, queue channels, and staff roles`,
-          `• Update or clear banners across every module`
-        ].join('\n')
-      ));
-
-      containerComponents.push({
-        type: 1,
-        components: [
-        ]
-      });
+      rows.push(buildModulesDropdown(botId));
+      rows.push(buildNavButtonRow(botId, 8));
       break;
     }
   }
 
-  // ── Closing notice strip ───────────────────────────────────────────────────
-  containerComponents.push({ type: 14, divider: true, spacing: 1 });
-  if (PAGE_NOTES[activePage]) {
-    containerComponents.push({
-      type: 10,
-      content: `> ${PAGE_NOTES[activePage]}`
-    });
-  }
-
-  // ── Navigation deck (two arrows kept, position pill, refresh, helper) ──
-  containerComponents.push({ type: 14, divider: true, spacing: 2 });
-  containerComponents.push({
-    type: 1,
-    components: [
-      {
-        type: 2,
-        style: 2,
-        emoji: EMOJIS.BTN_ARROW_LEFT,
-        custom_id: `cfg_nav_prev_${botId}_${activePage}`,
-        disabled: activePage <= 1
-      },
-      {
-        type: 2,
-        style: 2,
-        label: `${activePage} / ${TOTAL_PAGES}`,
-        custom_id: `cfg_pill_nav_${botId}_${activePage}`,
-        disabled: true
-      },
-      {
-        type: 2,
-        style: 2,
-        emoji: EMOJIS.BTN_ARROW_RIGHT,
-        custom_id: `cfg_nav_next_${botId}_${activePage}`,
-        disabled: activePage >= TOTAL_PAGES
-      },
-      {
-        type: 2,
-        style: 2,
-        label: 'Refresh',
-        custom_id: `cfg_nav_refresh_${botId}_${activePage}`
-      },
-      {
-        type: 2,
-        style: 3,
-        label: 'Helper',
-        custom_id: `cfg_btn_ai_helper_${botId}`
-      }
-    ]
-  });
-
-  // Bottom Accent Strip (Uploaded Banner or Local Fallback)
-  const bottomBanner = getPanelBottomBanner(cust.bottomBannerUrl);
-  if (bottomBanner.mediaUrl) {
-    containerComponents.push({
-      type: 12,
-      items: [{ media: { url: bottomBanner.mediaUrl } }]
-    });
-
-    if (includeAttachment && bottomBanner.attachment) {
-      files.push(bottomBanner.attachment);
-    }
-  }
-
   const payload = {
-    flags: 32768,
-    components: [
-      {
-        type: 17,
-        components: containerComponents
-      }
-    ]
+    embeds: [embed],
+    components: rows,
+    flags: 64
   };
 
   if (files.length > 0) {
@@ -691,10 +528,6 @@ export function buildConfigPanelPayload(botId, page = 1, includeAttachment = tru
 
   return payload;
 }
-
-
-
-
 
 // ══════════════════════════════════════════════════════════════════════
 // MODAL BUILDERS
@@ -1617,3 +1450,129 @@ export function buildWelcomeModal(botId) {
   return modal;
 }
 
+
+/**
+ * Build Initial Setup Modal
+ */
+export function buildInitialSetupModal(botId) {
+  const bot = getBotInstance(botId);
+  const modal = new ModalBuilder()
+    .setCustomId(`cfg_modal_initial_setup_${botId}`)
+    .setTitle('Mavely Credentials');
+
+  const tokenInput = new TextInputBuilder()
+    .setCustomId('discord_token')
+    .setLabel('Discord Bot Token (Required)')
+    .setStyle(TextInputStyle.Paragraph)
+    .setPlaceholder('Paste your Discord Bot Token')
+    .setRequired(true);
+  if (bot?.token && bot.token.trim().length > 0) tokenInput.setValue(bot.token.trim());
+
+  const apiKeyInput = new TextInputBuilder()
+    .setCustomId('erlc_api_key')
+    .setLabel('ER:LC Server API Key (Required)')
+    .setStyle(TextInputStyle.Short)
+    .setPlaceholder('Paste your ER:LC Server API Key')
+    .setRequired(true);
+  if (bot?.erlcApiKey && bot.erlcApiKey.trim().length > 0) apiKeyInput.setValue(bot.erlcApiKey.trim());
+
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(tokenInput),
+    new ActionRowBuilder().addComponents(apiKeyInput)
+  );
+
+  return modal;
+}
+
+/**
+ * Build Message Quota Modal
+ */
+export function buildMessageQuotaModal(botId) {
+  const bot = getBotInstance(botId);
+  const cust = bot?.customizations || {};
+
+  const modal = new ModalBuilder()
+    .setCustomId(`cfg_modal_quota_${botId}`)
+    .setTitle('Staff Message Quota');
+
+  const targetInput = new TextInputBuilder()
+    .setCustomId('quotaRequirement')
+    .setLabel('Weekly Messages Required')
+    .setStyle(TextInputStyle.Short)
+    .setPlaceholder('e.g. 100')
+    .setValue(cust.quotaRequirement || '100')
+    .setRequired(true);
+
+  const chanInput = new TextInputBuilder()
+    .setCustomId('quotaChannelId')
+    .setLabel('Quota Tracking Channel ID')
+    .setStyle(TextInputStyle.Short)
+    .setPlaceholder('Channel ID where quotas post')
+    .setValue(cust.quotaChannelId || '')
+    .setRequired(false);
+
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(targetInput),
+    new ActionRowBuilder().addComponents(chanInput)
+  );
+
+  return modal;
+}
+
+/**
+ * Build Forums Modal
+ */
+export function buildForumsModal(botId) {
+  const bot = getBotInstance(botId);
+  const cust = bot?.customizations || {};
+
+  const modal = new ModalBuilder()
+    .setCustomId(`cfg_modal_forums_${botId}`)
+    .setTitle('Community Forums Setup');
+
+  const chanInput = new TextInputBuilder()
+    .setCustomId('forumChannelId')
+    .setLabel('Forum Channel ID')
+    .setStyle(TextInputStyle.Short)
+    .setPlaceholder('Channel ID for community forums')
+    .setValue(cust.forumChannelId || '')
+    .setRequired(false);
+
+  modal.addComponents(new ActionRowBuilder().addComponents(chanInput));
+  return modal;
+}
+
+/**
+ * Build Daily Questions Modal
+ */
+export function buildDailyQuestionsModal(botId) {
+  const bot = getBotInstance(botId);
+  const cust = bot?.customizations || {};
+
+  const modal = new ModalBuilder()
+    .setCustomId(`cfg_modal_daily_q_${botId}`)
+    .setTitle('Daily Questions Setup');
+
+  const chanInput = new TextInputBuilder()
+    .setCustomId('dailyQuestionsChannelId')
+    .setLabel('Daily Questions Channel ID')
+    .setStyle(TextInputStyle.Short)
+    .setPlaceholder('Channel ID where questions post')
+    .setValue(cust.dailyQuestionsChannelId || '')
+    .setRequired(false);
+
+  const timeInput = new TextInputBuilder()
+    .setCustomId('dailyQuestionsTime')
+    .setLabel('Post Schedule Time')
+    .setStyle(TextInputStyle.Short)
+    .setPlaceholder('e.g. 12:00 PM EST')
+    .setValue(cust.dailyQuestionsTime || '12:00 PM')
+    .setRequired(false);
+
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(chanInput),
+    new ActionRowBuilder().addComponents(timeInput)
+  );
+
+  return modal;
+}

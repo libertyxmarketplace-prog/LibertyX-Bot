@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- *                    LIBERTX - CONFIGURATION SETTINGS
+ *                    MAVELY - CONFIGURATION SETTINGS
  * ============================================================================
  */
 
@@ -21,7 +21,7 @@ export const CONFIG = {
   STAFF_ROLE_IDS: [],
 
   // Panel text content matching exact reference screenshot (no bullet dot)
-  PANEL_TITLE: "LIBERTX Support",
+  PANEL_TITLE: "Mavely Support",
   PANEL_DESCRIPTION:
     "> If you require support, we ask you to **open a ticket and our team will be ready to help**. Choose the category that matches your issue below and a private channel will be opened for you. Any trolling or rule violations will result in instant moderation towards your account.",
 
@@ -45,7 +45,7 @@ export const CONFIG = {
 
   // Rules text redesigned with blockquotes and clean headers
   RULES_CONTENT: {
-    title: "LIBERTX | TICKET CENTER",
+    title: "MAVELY | TICKET CENTER",
     description: 
       "> Need help, want to report an issue, or have a question for our team? Select the ticket option that best matches your situation.\n" +
       "> Before opening a ticket, please read the information below carefully.\n\n" +
@@ -66,7 +66,7 @@ export const CONFIG = {
       "> • Ticket decisions and punishments may vary based on the severity of the situation.\n" +
       "> • Please do not open multiple tickets for the same issue unless instructed by staff.\n" +
       "> • Ticket transcripts may be archived through our ticket system.\n\n" +
-      "### LIBERTX\n" +
+      "### MAVELY\n" +
       "> Ensure your ticket has a valid reason and provide all necessary details. Rule violations lead to moderation."
   },
 
@@ -79,7 +79,7 @@ export const CONFIG = {
     NOTIFICATION_ROLE_ID: "1548112626389618718",
     DEFAULT_JOIN_CODE: "liberty",
     DESCRIPTION:
-      "> LIBERTX runs live, staff-supervised operations across Liberty County. Hop into the private server for structured patrols, realistic calls, and a respectful community atmosphere.",
+      "> Mavely runs live, staff-supervised operations across Liberty County. Hop into the private server for structured patrols, realistic calls, and a respectful community atmosphere.",
     CHANNEL_ID: "1548147260297322496",
     INGAME_VC_ID: "1550318371340550254",
     QUEUE_VC_ID: "1550318480136470638",
@@ -100,7 +100,7 @@ export const CONFIG = {
 
   // Welcome System Configuration
   WELCOME: {
-    ENABLED: false, // Automatic join welcome DISABLED — beta panel is posted ONCE in BETA_CHANNEL_ID only
+    ENABLED: false, // Automatic join welcome DISABLED - beta panel is posted ONCE in BETA_CHANNEL_ID only
     SEND_DM: false, // NEVER DM the beta panel to users
     BETA_CHANNEL_ID: "1552532418727125002", // Private beta tester announcement channel
     CHANNEL_ID: "1552529223460061284", // #𝖮𝗇𝖻𝗈𝖺𝗋𝖽𝗂𝗇𝗀
@@ -109,13 +109,13 @@ export const CONFIG = {
     WELCOME_EMOJI: "<:Logo:1552544997612589056>",
     PEOPLE_EMOJI_ID: "1547025501703372820",
     PEOPLE_EMOJI_NAME: "People",
-    SERVER_NAME: "LIBERTX"
+    SERVER_NAME: "Mavely"
   },
 
   // Departments System Configuration
   DEPARTMENTS: {
     ARROW_EMOJI: "<:Right_arrow:1550446417376448593>",
     TOP_BANNER_PATH: "./assets/department_banner.png",
-    SERVER_NAME: "LIBERTX"
+    SERVER_NAME: "Mavely"
   }
 };

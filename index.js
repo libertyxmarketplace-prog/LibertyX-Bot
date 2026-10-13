@@ -37,6 +37,11 @@ import {
 } from './botManager.js';
 import {
   buildConfigPanelPayload,
+  buildInitialSetupPayload,
+  buildInitialSetupModal,
+  buildMessageQuotaModal,
+  buildForumsModal,
+  buildDailyQuestionsModal,
   buildCredentialsModal,
   buildServerCoreModal,
   buildTicketCategoryNamesModal,
@@ -591,7 +596,7 @@ async function closeTicketWorkflow(channel, closedByUser, reasonOverride = null)
             `• **Duration:** ${durationStr}\n\n` +
             `*A complete transcript file has been archived and attached below for your records.*`
           )
-          .setFooter({ text: `${channel.guild?.name || 'LIBERTX'} Support` })
+          .setFooter({ text: `${channel.guild?.name || 'Mavely'} Support` })
           .setTimestamp();
 
         const dmPayload = { embeds: [dmEmbed] };
@@ -621,7 +626,7 @@ async function closeTicketWorkflow(channel, closedByUser, reasonOverride = null)
 
 client.once(Events.ClientReady, async () => {
   console.log(`=============================================`);
-  console.log(` LIBERTX Bot logged in as ${client.user.tag}`);
+  console.log(` Mavely Bot logged in as ${client.user.tag}`);
   console.log(` Loaded ${CONFIG.CATEGORIES.length} Support Categories`);
   console.log(`=============================================`);
 
@@ -764,7 +769,7 @@ client.on(Events.GuildMemberAdd, async member => {
 
     const payload = buildBetaTesterWelcomePayload({
       userId: member.id,
-      serverName: member.guild?.name || CONFIG.WELCOME?.SERVER_NAME || 'LIBERTX'
+      serverName: member.guild?.name || CONFIG.WELCOME?.SERVER_NAME || 'Mavely'
     });
 
     let sent = false;
@@ -923,7 +928,7 @@ export async function handleMessageCreate(message) {
       const targetUser = message.mentions.users.first() || message.author;
       const payload = buildBetaTesterWelcomePayload({
         userId: targetUser.id,
-        serverName: message.guild?.name || 'LIBERTX'
+        serverName: message.guild?.name || 'Mavely'
       });
 
       if (args[0] === 'dm') {
@@ -934,7 +939,7 @@ export async function handleMessageCreate(message) {
       await message.channel.send(payload).catch(async () => {
         const embedPayload = buildBetaTesterWelcomeEmbed({
           userId: targetUser.id,
-          serverName: message.guild?.name || 'LIBERTX'
+          serverName: message.guild?.name || 'Mavely'
         });
         await message.channel.send(embedPayload).catch(() => null);
       });
@@ -1623,7 +1628,7 @@ export async function handleMessageCreate(message) {
       const fullArgs = args.join(' ').trim();
       if (!fullArgs || fullArgs.toLowerCase() === 'help') {
         const helpEmbed = new EmbedBuilder()
-          .setTitle('LIBERTX | Leave of Absence (LOA) Format')
+          .setTitle('Mavely | Leave of Absence (LOA) Format')
           .setDescription(
             `> To submit an official Leave of Absence, please use the standard format:\n\n` +
             `\`-loa <Duration or End Date> | <Reason>\`\n\n` +
@@ -1634,7 +1639,7 @@ export async function handleMessageCreate(message) {
             `*Once submitted, your request will be dispatched to Staff Management in <#1548336007311527996> for review.*`
           )
           .setColor(0x0284c7)
-          .setFooter({ text: 'LIBERTX Staff Administration • Leave System' });
+          .setFooter({ text: 'Mavely Staff Administration • Leave System' });
 
         return message.channel.send({ embeds: [helpEmbed] });
       }
@@ -1900,10 +1905,19 @@ setMessageHandler(handleMessageCreate);
  */
 function resolveConfigPanelPage(interaction, fallbackPage = 1) {
   try {
+    const footerText = interaction.message?.embeds?.[0]?.footer?.text;
+    if (footerText) {
+      const m = footerText.match(/Page (\d+) of (\d+)/);
+      if (m) return { page: parseInt(m[1], 10), total: parseInt(m[2], 10) };
+    }
     const walk = (components) => {
       for (const comp of components || []) {
         if (comp && typeof comp.content === 'string') {
           const m = comp.content.match(/Page (\d+) of (\d+)/);
+          if (m) return { page: parseInt(m[1], 10), total: parseInt(m[2], 10) };
+        }
+        if (comp?.label && typeof comp.label === 'string') {
+          const m = comp.label.match(/^(\d+)\s*\/\s*(\d+)$/);
           if (m) return { page: parseInt(m[1], 10), total: parseInt(m[2], 10) };
         }
         const nested = walk(comp?.components);
@@ -1947,6 +1961,9 @@ function buildConfigActionModal(botId, action) {
     case 'edit_welcome': return buildWelcomeModal(botId);
     case 'edit_ai_key': return buildAiKeyModal(botId);
     case 'ask_ai': return buildAskAiModal(botId);
+    case 'edit_quota': return buildMessageQuotaModal(botId);
+    case 'edit_forums': return buildForumsModal(botId);
+    case 'edit_daily_q': return buildDailyQuestionsModal(botId);
     default: return null;
   }
 }
@@ -1974,7 +1991,7 @@ export async function handleInteraction(interaction) {
     }
 
     // Guard buttons, modals, and select menus for the master bot - config UI plus whitelisted cards
-    if (isMasterBot && (interaction.isButton() || interaction.isModalSubmit() || interaction.isStringSelectMenu() || interaction.isChannelSelectMenu())) {
+    if (isMasterBot && (interaction.isButton() || interaction.isModalSubmit() || interaction.isAnySelectMenu())) {
       const cid = interaction.customId || '';
       if (!MASTER_UI_ALLOWED.some(prefix => cid.startsWith(prefix))) {
         return; // LIBERTX ignores unrelated UI interactions
@@ -2009,9 +2026,10 @@ export async function handleInteraction(interaction) {
 
       // /config [page] [bot_id] (Only available on Central Master Bot)
       if (interaction.commandName === 'config') {
+        console.log(`[CONFIG CMD] /config triggered by @${interaction.user.tag || interaction.user.id} in guild ${interaction.guild?.id || 'DM'}`);
         if (interaction.client.user.id !== client.user.id) {
           return interaction.reply({
-            content: `${EMOJIS.CROSS} /config is only available from the official LIBERTX bot. Please run it there.`,
+            content: `${EMOJIS.CROSS} /config is only available from the official Mavely bot. Please run it there.`,
             flags: 64
           });
         }
@@ -2061,7 +2079,14 @@ export async function handleInteraction(interaction) {
           }).catch(() => null);
         }
 
-        const payload = buildConfigPanelPayload(targetBot.botId, requestedPage, true);
+        const hasToken = Boolean(targetBot.token && targetBot.token.trim().length > 0);
+        const hasApiKey = Boolean(targetBot.erlcApiKey && targetBot.erlcApiKey.trim().length > 0);
+        const isSetupComplete = targetBot.setupCompleted && hasToken && hasApiKey;
+
+        const payload = isSetupComplete
+          ? buildConfigPanelPayload(targetBot.botId, requestedPage, true)
+          : buildInitialSetupPayload(targetBot.botId, targetBot);
+
         return sendConfigResponse(payload).catch(err => {
           if (err.code !== 40060 && err.code !== 10062) {
             console.error('[CONFIG] sendResponse error:', err);
@@ -3457,6 +3482,58 @@ export async function handleInteraction(interaction) {
         });
       }
 
+      // /config Staff Role Select Menu
+      if (interaction.customId.startsWith('cfg_role_staff_')) {
+        const botId = interaction.customId.replace('cfg_role_staff_', '');
+        const selectedRoleId = interaction.values?.[0] || '';
+        updateBotCustomization(botId, 'botStaffRoleId', selectedRoleId);
+        const payload = buildConfigPanelPayload(botId, 1, false);
+        return interaction.update(payload).catch(() => null);
+      }
+
+      // /config Admin Role Select Menu
+      if (interaction.customId.startsWith('cfg_role_admin_')) {
+        const botId = interaction.customId.replace('cfg_role_admin_', '');
+        const selectedRoleId = interaction.values?.[0] || '';
+        updateBotCustomization(botId, 'adminRoleId', selectedRoleId);
+        updateBotCustomization(botId, 'staffRoleIds', [selectedRoleId]);
+        const payload = buildConfigPanelPayload(botId, 1, false);
+        return interaction.update(payload).catch(() => null);
+      }
+
+      // /config Advanced Permissions Select Menu
+      if (interaction.customId.startsWith('cfg_menu_advperm_')) {
+        const botId = interaction.customId.replace('cfg_menu_advperm_', '');
+        const action = interaction.values?.[0];
+        if (!action) return;
+        const actionModal = buildConfigActionModal(botId, action);
+        if (actionModal) {
+          return interaction.showModal(actionModal).catch(() => null);
+        }
+      }
+
+      // /config Modules Select Menu
+      if (interaction.customId.startsWith('cfg_menu_modules_')) {
+        const botId = interaction.customId.replace('cfg_menu_modules_', '');
+        const value = interaction.values?.[0];
+        if (!value) return;
+
+        if (value.startsWith('nav_page_')) {
+          const targetPage = parseInt(value.replace('nav_page_', ''), 10) || 1;
+          const payload = buildConfigPanelPayload(botId, targetPage, false);
+          return interaction.update(payload).catch(() => null);
+        }
+
+        if (value === 'ask_ai') {
+          return interaction.showModal(buildAskAiModal(botId)).catch(() => null);
+        }
+
+        const actionModal = buildConfigActionModal(botId, value);
+        if (actionModal) {
+          return interaction.showModal(actionModal).catch(() => null);
+        }
+      }
+
       // /config category navigation select menu
       // /config section tab bar (highlighted-blue pills above the cards)
       if (interaction.customId.startsWith('cfg_tab_')) {
@@ -3720,6 +3797,93 @@ export async function handleInteraction(interaction) {
         }
         return '';
       };
+
+      // Initial Setup Modal Submit
+      if (interaction.customId.startsWith('cfg_modal_initial_setup_')) {
+        await interaction.deferUpdate().catch(() => null);
+        const botId = interaction.customId.replace('cfg_modal_initial_setup_', '');
+        let token = getModalVal('discord_token');
+        token = token.replace(/^["']|["']$/g, '').trim();
+        if (token.startsWith('Bot ')) token = token.slice(4).trim();
+
+        let erlcApiKey = getModalVal('erlc_api_key');
+        erlcApiKey = erlcApiKey.replace(/^["']|["']$/g, '').trim();
+
+        const updates = {
+          token,
+          status: token ? 'active' : 'unconfigured',
+          setupCompleted: Boolean(token && erlcApiKey),
+          banned: false,
+          bannedReason: null
+        };
+        if (erlcApiKey) updates.erlcApiKey = erlcApiKey;
+        if (interaction.guild?.id) updates.guildId = interaction.guild.id;
+
+        updateBotInstance(botId, updates);
+
+        if (token) {
+          try {
+            console.log(`[INITIAL SETUP] Connecting bot ${botId}...`);
+            await startCustomerBot(botId);
+          } catch (err) {
+            console.warn(`[CUSTOMER BOT] Error starting bot ${botId}:`, err.message);
+          }
+        }
+
+        if (erlcApiKey) {
+          try {
+            const res = await fetch('https://api.erlc.gg/v1/server', {
+              headers: { 'Server-Key': erlcApiKey },
+              signal: AbortSignal.timeout(3500)
+            });
+            if (res.ok) {
+              const sData = await res.json();
+              if (sData?.Name) updateBotCustomization(botId, 'serverName', sData.Name);
+              const detectedCode = sData?.JoinKey || sData?.JoinCode || sData?.joinKey || sData?.joinCode;
+              if (detectedCode) updateBotCustomization(botId, 'joinCode', detectedCode);
+            }
+          } catch (e) {
+            console.warn('[ERLC AUTO-DETECT ERROR]:', e.message);
+          }
+        }
+
+        const payload = buildConfigPanelPayload(botId, 1, false);
+        return interaction.editReply(payload).catch(() => null);
+      }
+
+      // Message Quota Modal Submit
+      if (interaction.customId.startsWith('cfg_modal_quota_')) {
+        await interaction.deferUpdate().catch(() => null);
+        const botId = interaction.customId.replace('cfg_modal_quota_', '');
+        const quotaRequirement = getModalVal('quotaRequirement');
+        const quotaChannelId = getModalVal('quotaChannelId');
+        if (quotaRequirement) updateBotCustomization(botId, 'quotaRequirement', quotaRequirement);
+        if (quotaChannelId) updateBotCustomization(botId, 'quotaChannelId', quotaChannelId);
+        const payload = buildConfigPanelPayload(botId, 7, false);
+        return interaction.editReply(payload).catch(() => null);
+      }
+
+      // Forums Modal Submit
+      if (interaction.customId.startsWith('cfg_modal_forums_')) {
+        await interaction.deferUpdate().catch(() => null);
+        const botId = interaction.customId.replace('cfg_modal_forums_', '');
+        const forumChannelId = getModalVal('forumChannelId');
+        if (forumChannelId) updateBotCustomization(botId, 'forumChannelId', forumChannelId);
+        const payload = buildConfigPanelPayload(botId, 7, false);
+        return interaction.editReply(payload).catch(() => null);
+      }
+
+      // Daily Questions Modal Submit
+      if (interaction.customId.startsWith('cfg_modal_daily_q_')) {
+        await interaction.deferUpdate().catch(() => null);
+        const botId = interaction.customId.replace('cfg_modal_daily_q_', '');
+        const dailyQuestionsChannelId = getModalVal('dailyQuestionsChannelId');
+        const dailyQuestionsTime = getModalVal('dailyQuestionsTime');
+        if (dailyQuestionsChannelId) updateBotCustomization(botId, 'dailyQuestionsChannelId', dailyQuestionsChannelId);
+        if (dailyQuestionsTime) updateBotCustomization(botId, 'dailyQuestionsTime', dailyQuestionsTime);
+        const payload = buildConfigPanelPayload(botId, 7, false);
+        return interaction.editReply(payload).catch(() => null);
+      }
 
       // Configuration Credentials Modal Submit (Page 1)
       if (interaction.customId.startsWith('cfg_modal_creds_')) {
@@ -4900,6 +5064,23 @@ export async function handleInteraction(interaction) {
         return interaction.update(payload).catch(() => null);
       }
 
+      // Initial Setup Buttons
+      if (interaction.customId.startsWith('cfg_btn_initial_setup_')) {
+        const botId = interaction.customId.replace('cfg_btn_initial_setup_', '');
+        return interaction.showModal(buildInitialSetupModal(botId)).catch(() => null);
+      }
+
+      if (interaction.customId.startsWith('cfg_btn_skip_setup_')) {
+        const botId = interaction.customId.replace('cfg_btn_skip_setup_', '');
+        const payload = buildConfigPanelPayload(botId, 1, false);
+        return interaction.update(payload).catch(() => null);
+      }
+
+      if (interaction.customId.startsWith('cfg_nav_helper_')) {
+        const botId = interaction.customId.replace('cfg_nav_helper_', '');
+        return interaction.showModal(buildAskAiModal(botId)).catch(() => null);
+      }
+
       // Config Navigation Buttons (Zero-lag pagination - no file re-upload)
       if (interaction.customId.startsWith('cfg_nav_prev_')) {
         const parts = interaction.customId.replace('cfg_nav_prev_', '').split('_');
@@ -4911,10 +5092,10 @@ export async function handleInteraction(interaction) {
         try {
           return await interaction.update(payload);
         } catch (err) {
-          if (err.code !== 40060 && err.code !== 10062) {
-            console.error('[CONFIG NAV PREV ERROR]:', err);
+          if (!interaction.replied && !interaction.deferred) {
+            return await interaction.reply({ ...payload, flags: 64 }).catch(() => null);
           }
-          return await interaction.editReply(payload).catch(() => null);
+          return await interaction.followUp({ ...payload, flags: 64 }).catch(() => null);
         }
       }
 
@@ -4928,10 +5109,10 @@ export async function handleInteraction(interaction) {
         try {
           return await interaction.update(payload);
         } catch (err) {
-          if (err.code !== 40060 && err.code !== 10062) {
-            console.error('[CONFIG NAV NEXT ERROR]:', err);
+          if (!interaction.replied && !interaction.deferred) {
+            return await interaction.reply({ ...payload, flags: 64 }).catch(() => null);
           }
-          return await interaction.editReply(payload).catch(() => null);
+          return await interaction.followUp({ ...payload, flags: 64 }).catch(() => null);
         }
       }
 
@@ -4944,10 +5125,10 @@ export async function handleInteraction(interaction) {
         try {
           return await interaction.update(payload);
         } catch (err) {
-          if (err.code !== 40060 && err.code !== 10062) {
-            console.error('[CONFIG NAV REFRESH ERROR]:', err);
+          if (!interaction.replied && !interaction.deferred) {
+            return await interaction.reply({ ...payload, flags: 64 }).catch(() => null);
           }
-          return await interaction.editReply(payload).catch(() => null);
+          return await interaction.followUp({ ...payload, flags: 64 }).catch(() => null);
         }
       }
 
@@ -5342,13 +5523,13 @@ export async function handleInteraction(interaction) {
           {
             type: 10,
             content:
-              `## LIBERTX | Application Submitted\n` +
+              `## Mavely | Application Submitted\n` +
               `> Your **${roleName}** application has been transmitted to the Executive Team for review.\n\n` +
               `### Application Details\n` +
               `> • **Status:** Submitted & Pending Review\n` +
               `> • **Reference ID:** \`${submissionId.slice(0, 8).toUpperCase()}\`\n` +
               `> • **Notifications:** You will receive a direct message notification here once a decision has been reached.\n\n` +
-              `> *Inquiries regarding the status of your application will result in denial. Thank you for applying to LIBERTX.*`
+              `> *Inquiries regarding the status of your application will result in denial. Thank you for applying to Mavely.*`
           }
         ];
 
@@ -5395,7 +5576,7 @@ export async function handleInteraction(interaction) {
                 {
                   type: 10,
                   content:
-                    `## LIBERTX | Application Cancelled\n` +
+                    `## Mavely | Application Cancelled\n` +
                     `> Your staff application session has been cancelled.\n` +
                     `> You may start a new application at any time from the server panel.`
                 }
@@ -5875,7 +6056,7 @@ export async function handleInteraction(interaction) {
                 .setImage(CONFIG.SESSION.VOTE_TOP_BANNER_URL)
                 .setTitle('Session Vote Completed | Action Required')
                 .setDescription(
-                  `> The session vote in **LIBERTX** has reached its goal of **${vote.requiredVotes} votes** in <#${vote.channelId}>.\n\n` +
+                  `> The session vote in **Mavely** has reached its goal of **${vote.requiredVotes} votes** in <#${vote.channelId}>.\n\n` +
                   `Choose an action below to proceed with the session startup:`
                 );
               const fallbackRow = new ActionRowBuilder().addComponents(

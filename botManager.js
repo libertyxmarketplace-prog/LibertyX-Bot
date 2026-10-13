@@ -120,7 +120,15 @@ export const DEFAULT_CUSTOMIZATIONS = {
 
   // ─── Staff Roles & Permissions ─────────────────────────────────────────────
   botStaffRoleId: "",           // Authorized bot staff role required to execute customer bot staff commands
+  adminRoleId: "",              // Administrator staff role
   staffRoleIds: [],
+
+  // ─── New Community Modules ─────────────────────────────────────────────────
+  quotaRequirement: "100",      // Weekly message quota target
+  quotaChannelId: "",           // Quota updates channel
+  forumChannelId: "",           // Forums channel
+  dailyQuestionsChannelId: "",  // Daily questions channel
+  dailyQuestionsTime: "12:00 PM", // Daily questions schedule time
 
   // ─── AI ────────────────────────────────────────────────────────────────────
   aiProvider: "openrouter",

@@ -337,8 +337,8 @@ export function getOrCreateBotInstanceForUser(ownerUserId, guildId = null) {
     }
   }
 
-  // 2. If guild has a master or pre-existing instance, use it
-  if (guildId && instances[PRIMARY_BOT_ID] && !instances[PRIMARY_BOT_ID].banned) {
+  // 2. If no owner specified and guild has a master instance, use it as fallback
+  if (!ownerUserId && guildId && instances[PRIMARY_BOT_ID] && !instances[PRIMARY_BOT_ID].banned) {
     return instances[PRIMARY_BOT_ID];
   }
 

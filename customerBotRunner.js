@@ -5,7 +5,7 @@ import {
   Events,
   ActivityType
 } from 'discord.js';
-import { loadBotInstances, getBotInstance, updateBotInstance, setOnBotBanned, setOnBotUnbanned } from './botManager.js';
+import { loadBotInstances, getBotInstance, updateBotInstance, setOnBotBanned, setOnBotUnbanned, MASTER_BOT_ID } from './botManager.js';
 import { deployCommands, customerCommands } from './deploy-commands.js';
 
 // Map of active running clients: botId -> Client
@@ -252,6 +252,7 @@ function createCustomerClient(bot, intents) {
 }
 
 export async function startCustomerBot(botId) {
+  if (botId === MASTER_BOT_ID) return false;
   const bot = getBotInstance(botId);
   if (!bot || !bot.token || bot.token.trim() === '' || bot.banned) {
     if (bot?.banned && activeCustomerClients.has(botId)) {
@@ -528,6 +529,7 @@ export async function startAllConfiguredBots() {
   startWatchdog();
   const instances = loadBotInstances();
   for (const [bId, bot] of Object.entries(instances)) {
+    if (bId === MASTER_BOT_ID) continue;
     // 'invalid_token' is retryable: a boot attempt re-validates the token so a
     // previously revoked/reset token comes back online on its own.
     if (bot.token && bot.token.trim() !== '' && !bot.banned) {

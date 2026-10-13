@@ -3950,6 +3950,7 @@ export async function handleInteraction(interaction) {
         };
         if (erlcApiKey) updates.erlcApiKey = erlcApiKey;
         if (interaction.guild?.id) updates.guildId = interaction.guild.id;
+        if (interaction.user?.id) updates.ownerUserId = interaction.user.id;
 
         updateBotInstance(botId, updates);
 
@@ -3979,7 +3980,12 @@ export async function handleInteraction(interaction) {
           }
         }
 
-        const payload = buildConfigPanelPayload(botId, 1, false, interaction.guild);
+        const currentBot = getBotInstance(botId);
+        const hasToken = Boolean(currentBot?.token && currentBot.token.trim().length > 0);
+        const hasApiKey = Boolean(currentBot?.erlcApiKey && currentBot.erlcApiKey.trim().length > 0);
+        const payload = (hasToken && hasApiKey)
+          ? buildConfigPanelPayload(botId, 1, false, interaction.guild)
+          : buildInitialSetupPayload(botId, currentBot);
         return interaction.editReply(payload).catch(() => null);
       }
 

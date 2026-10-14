@@ -60,6 +60,12 @@ async function run() {
     return `- [\`${shortSha}\`](${c.url}) ${firstLine}`;
   }).join('\n');
 
+  // Check if any commit contains an [ALERT], [MAJOR], or BREAKING flag
+  const isMajorAlert = commits.some(c => {
+    const msg = (c.message || '').toUpperCase();
+    return msg.includes('[ALERT]') || msg.includes('[MAJOR]') || msg.includes('BREAKING:') || msg.includes('[CRITICAL]');
+  });
+
   const now = new Date();
   const dateFormatted = now.toLocaleDateString('en-US', {
     month: 'short',
@@ -74,9 +80,9 @@ async function run() {
   const mavelyLogoUrl = 'https://raw.githubusercontent.com/libertyxmarketplace-prog/Mavelybot/main/assets/mavely_logo.png';
 
   const embed = {
-    color: 0x1fd186, // Mavely Mint Green (#1FD186)
+    color: isMajorAlert ? 0xed4245 : 0x1fd186, // Red for major alert, Mavely Mint Green for normal
     author: {
-      name: 'Mavely | Development Update',
+      name: isMajorAlert ? 'Mavely | Critical Alert' : 'Mavely | Development Update',
       icon_url: mavelyLogoUrl
     },
     thumbnail: {
@@ -86,6 +92,7 @@ async function run() {
       `**Developer:** ${devDisplayName}`,
       `**Repository:** [${repoName}](${repoUrl})`,
       `**Branch:** \`${branch}\` (${commitCount} commit${commitCount === 1 ? '' : 's'})`,
+      ...(isMajorAlert ? ['**Alert:** Major / breaking changes detected in this push!'] : []),
       '',
       `**Changes**`,
       commitLines
@@ -97,7 +104,7 @@ async function run() {
   };
 
   const payload = {
-    content: '@Updates',
+    content: isMajorAlert ? '@here' : '',
     embeds: [embed],
     components: [
       {

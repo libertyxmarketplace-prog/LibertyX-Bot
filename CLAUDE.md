@@ -46,3 +46,13 @@ This repository contains **Mavely** (the master bot) and the **Customer Bot Mult
 - To test customer bot runner locally: `node customerBotRunner.js`
 - To test the master bot & web server: `node server.js`
 - Run Git branches for every new feature: `git checkout -b feature/your-feature-name`
+
+## Commit & Git Push Rules (MANDATORY)
+1. **Simple, Plain English Commit Messages:**
+   - Commit messages MUST be written in very simple, plain English so the lead developer can easily understand what was changed.
+   - Do NOT use overly complex technical jargon or confusing words.
+   - Explain what feature was added or what bug was fixed in plain everyday language.
+   - Example: "Fixed ticket close button error" or "Added music pause and resume command".
+2. **Major / Breaking Changes Alerting:**
+   - If a change is dangerous, breaks an existing feature, modifies database schemas, or touches core bot configs, ALWAYS start the commit message with `[ALERT]` (e.g. `[ALERT] Changed database schema for tickets`).
+   - The Discord notification system will automatically flag this and ping `@here` to alert the team.
